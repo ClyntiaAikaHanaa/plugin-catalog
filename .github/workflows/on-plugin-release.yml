@@ -1,0 +1,91 @@
+name: Update catalog on plugin release
+
+# Dipicu repo plugin lewat `repository_dispatch` setelah rilisnya terbit
+# (PRD §10.5). `workflow_dispatch` ada sebagai jalur manual saat dispatch gagal
+# — tanpa itu, satu workflow yang gagal berarti mengedit JSON dengan tangan.
+on:
+  repository_dispatch:
+    types: [plugin-release]
+  workflow_dispatch:
+    inputs:
+      plugin_id:
+        required: true
+        description: "id plugin di katalog, mis. mycomp"
+      repo:
+        required: true
+        description: "owner/repo asal rilis"
+      tag:
+        required: true
+        description: "tag rilis, mis. v1.3.0"
+      breaking:
+        required: false
+        default: "false"
+      security:
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalog-write
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Resolve inputs
+        id: input
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "plugin=${{ github.event.client_payload.plugin_id }}" >> "$GITHUB_OUTPUT"
+            echo "repo=${{ github.event.client_payload.repo }}"        >> "$GITHUB_OUTPUT"
+            echo "tag=${{ github.event.client_payload.tag }}"          >> "$GITHUB_OUTPUT"
+            echo "breaking=${{ github.event.client_payload.breaking }}" >> "$GITHUB_OUTPUT"
+            echo "security=${{ github.event.client_payload.security }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "plugin=${{ inputs.plugin_id }}" >> "$GITHUB_OUTPUT"
+            echo "repo=${{ inputs.repo }}"        >> "$GITHUB_OUTPUT"
+            echo "tag=${{ inputs.tag }}"          >> "$GITHUB_OUTPUT"
+            echo "breaking=${{ inputs.breaking }}" >> "$GITHUB_OUTPUT"
+            echo "security=${{ inputs.security }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Mengunduh asset dan menghitung SHA-256 sendiri — nilai yang dikirim
+      # payload tidak dipercaya (§10.5 langkah 2).
+      - name: Ingest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node scripts/fetch-release.mjs \
+            --plugin   "${{ steps.input.outputs.plugin }}" \
+            --repo     "${{ steps.input.outputs.repo }}" \
+            --tag      "${{ steps.input.outputs.tag }}" \
+            --breaking "${{ steps.input.outputs.breaking }}" \
+            --security "${{ steps.input.outputs.security }}"
+
+      - name: Validate
+        run: npm run validate
+
+      - name: Build catalog
+        run: npm run build
+
+      - name: Commit
+        run: |
+          git config user.name  "catalog-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add src/plugins dist
+          if git diff --cached --quiet; then
+            echo "tidak ada perubahan"
+            exit 0
+          fi
+          git commit -m "catalog: ${{ steps.input.outputs.plugin }} ${{ steps.input.outputs.tag }}"
+          git push

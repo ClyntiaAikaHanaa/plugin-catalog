@@ -1,0 +1,30 @@
+[
+  { "name": "FL Studio", "executables": ["FL64.exe", "FL.exe"] },
+  {
+    "name": "Ableton Live",
+    "executables": [
+      "Ableton Live 11 Suite.exe",
+      "Ableton Live 11 Standard.exe",
+      "Ableton Live 12 Suite.exe",
+      "Ableton Live 12 Standard.exe",
+      "Ableton Live 12 Intro.exe"
+    ]
+  },
+  { "name": "REAPER", "executables": ["reaper.exe", "reaper_host_x64.exe"] },
+  {
+    "name": "Bitwig Studio",
+    "executables": ["BitwigStudio.exe", "BitwigPluginHost64.exe"]
+  },
+  {
+    "name": "Cubase",
+    "executables": ["Cubase12.exe", "Cubase13.exe", "Cubase14.exe"]
+  },
+  { "name": "Nuendo", "executables": ["Nuendo13.exe", "Nuendo14.exe"] },
+  { "name": "Studio One", "executables": ["Studio One.exe"] },
+  { "name": "Pro Tools", "executables": ["ProTools.exe"] },
+  { "name": "Cakewalk", "executables": ["Cakewalk.exe"] },
+  { "name": "Reason", "executables": ["Reason.exe"] },
+  { "name": "Waveform", "executables": ["Waveform.exe"] },
+  { "name": "Mixcraft", "executables": ["Mixcraft.exe"] },
+  { "name": "Plugin scanner", "executables": ["plugin-scan.exe", "VstScanner.exe"] }
+]

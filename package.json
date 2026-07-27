@@ -1,0 +1,17 @@
+{
+  "name": "plugin-catalog",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Katalog plugin Studio Hub — data, bukan kode. Merilis plugin baru = satu commit ke repo ini.",
+  "scripts": {
+    "build": "node scripts/build-catalog.mjs",
+    "validate": "node scripts/validate.mjs",
+    "check": "npm run validate && npm run build",
+    "smoke": "node scripts/smoke-test.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}

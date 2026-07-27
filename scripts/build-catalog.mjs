@@ -1,0 +1,50 @@
+#!/usr/bin/env node
+//
+// Gabungkan `src/plugins/*.json` → `dist/catalog.json` (PRD §10.1).
+//
+// `catalog.json` adalah **artefak build**, tidak pernah diedit tangan. File
+// besar yang diedit manual akan sering konflik dan mudah rusak; memisahkannya
+// per plugin membuat diff bersih dan memungkinkan otomatisasi menulis hanya
+// file yang berubah.
+
+import { cp, mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
+import { DIST, ROOT, ok, readJson, readPluginFiles } from "./lib.mjs";
+
+const launcher = await readJson(join(ROOT, "src", "launcher.json"));
+const dawProcesses = await readJson(join(ROOT, "src", "daw-processes.json"));
+const categories = await readJson(join(ROOT, "src", "categories.json"));
+const pluginFiles = await readPluginFiles();
+
+const catalog = {
+  schema_version: 1,
+  generated_at: new Date().toISOString(),
+  // Dikendalikan server, bukan hardcoded di client — TTL dapat diperpendek
+  // saat merilis hotfix penting (§10.3).
+  catalog_ttl_seconds: 21600,
+  launcher,
+  daw_processes: dawProcesses,
+  categories,
+  plugins: pluginFiles.map((p) => p.data),
+};
+
+await mkdir(DIST, { recursive: true });
+await writeFile(join(DIST, "catalog.json"), `${JSON.stringify(catalog, null, 2)}\n`);
+await cp(join(ROOT, "schema", "catalog.schema.json"), join(DIST, "catalog.schema.json"));
+
+// Manifest updater launcher disajikan dari domain yang sama dengan katalog,
+// sehingga migrasi hosting memindahkan keduanya sekaligus (R4).
+const launcherManifest = join(ROOT, "src", "launcher", "latest.json");
+if (existsSync(launcherManifest)) {
+  await mkdir(join(DIST, "launcher"), { recursive: true });
+  await cp(launcherManifest, join(DIST, "launcher", "latest.json"));
+}
+
+const assets = join(ROOT, "assets");
+if (existsSync(assets)) {
+  await cp(assets, join(DIST, "assets"), { recursive: true });
+}
+
+ok(`dist/catalog.json — ${catalog.plugins.length} plugin`);

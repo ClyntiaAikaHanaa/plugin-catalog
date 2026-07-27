@@ -1,0 +1,7 @@
+* text=auto eol=lf
+
+# Workflow menjalankan `run:` sebagai shell script di runner Linux. CRLF di
+# situ membuat baris perintah gagal dengan error yang membingungkan.
+*.yml text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf

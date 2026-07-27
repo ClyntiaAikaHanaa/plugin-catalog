@@ -1,0 +1,104 @@
+# Template workflow untuk SETIAP repo plugin (PRD §15.2).
+#
+# Salin ke `.github/workflows/release.yml` di repo plugin, lalu sesuaikan
+# langkah build sesuai build system plugin itu (CMake/JUCE, iPlug2, dsb).
+#
+# Setelah ini terpasang, merilis plugin adalah:
+#
+#     git tag v1.3.0 && git push --tags
+#
+# Tidak ada langkah manual, tidak ada hash yang dihitung tangan, dan katalog
+# tidak bisa berbeda dari kenyataan.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write # untuk membuat GitHub Release
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: recursive
+
+      - name: Configure & build
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+
+      # Plugin DLL dimuat ke dalam proses DAW, jadi AV memeriksanya. Tanpa
+      # tanda tangan, launcher yang bertanda tangan pun tidak menolong (Q10).
+      - name: Sign plugin binary
+        if: ${{ secrets.CERT_THUMBPRINT != '' }}
+        env:
+          CERT_THUMBPRINT: ${{ secrets.CERT_THUMBPRINT }}
+        run: |
+          signtool sign /sha1 $env:CERT_THUMBPRINT /fd SHA256 `
+            /tr http://timestamp.digicert.com /td SHA256 `
+            "build\${{ vars.BUNDLE_NAME }}\Contents\x86_64-win\*.vst3"
+
+      # Struktur ZIP wajib punya `<Nama>.vst3` sebagai entri AKAR — itu yang
+      # dicek `archive_root` di katalog. Kalau `Compress-Archive` menyertakan
+      # folder induk, launcher akan menolak arsipnya setelah unduhan selesai.
+      - name: Package
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart("v")
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path "build\${{ vars.BUNDLE_NAME }}" `
+            -DestinationPath "dist\${{ vars.PLUGIN_ID }}-$v-win64.zip"
+
+      - name: Verify archive root
+        run: |
+          $zip = Get-ChildItem dist\*.zip | Select-Object -First 1
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
+          $roots = $archive.Entries | ForEach-Object { ($_.FullName -split '/')[0] } |
+                   Sort-Object -Unique
+          $archive.Dispose()
+          if ($roots -ne "${{ vars.BUNDLE_NAME }}") {
+            Write-Error "entri akar ZIP '$roots' bukan '${{ vars.BUNDLE_NAME }}'"
+            exit 1
+          }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@01570a1f39cb168c169c802c3bceb9e93fb10974 # v2.1.0
+        with:
+          files: dist/*.zip
+          # Body rilis menjadi changelog yang dibaca pengguna di launcher.
+          generate_release_notes: true
+          draft: false
+
+      # Beri tahu repo katalog. Katalog yang mengunduh asset dan menghitung
+      # SHA-256 sendiri — nilai dari sini tidak dipercaya (§10.5).
+      - name: Notify catalog
+        env:
+          GH_TOKEN: ${{ secrets.CATALOG_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/${{ vars.CATALOG_REPO }}/dispatches `
+            -f event_type=plugin-release `
+            -F client_payload[plugin_id]=${{ vars.PLUGIN_ID }} `
+            -F client_payload[version]=${{ github.ref_name }} `
+            -F client_payload[repo]=${{ github.repository }} `
+            -F client_payload[tag]=${{ github.ref_name }} `
+            -F client_payload[breaking]=${{ vars.BREAKING || 'false' }} `
+            -F client_payload[security]=${{ vars.SECURITY || 'false' }}
+# ─────────────────────────────────────────────────────────────────────────
+# Yang harus diatur di setiap repo plugin (Settings → Secrets and variables):
+#
+#   Variables:
+#     PLUGIN_ID    = id di katalog, mis. "mycomp"
+#     BUNDLE_NAME  = nama folder bundle, mis. "MyComp.vst3"
+#     CATALOG_REPO = "<akun>/plugin-catalog"
+#     BREAKING     = "true" hanya saat merilis versi yang mengubah suara
+#                    atau format preset. Kalau ragu, isi "true".
+#
+#   Secrets:
+#     CATALOG_DISPATCH_TOKEN = fine-grained PAT, akses HANYA ke repo katalog,
+#                              permission Contents: Read and write.
+#     CERT_THUMBPRINT        = opsional, saat code signing sudah ada.

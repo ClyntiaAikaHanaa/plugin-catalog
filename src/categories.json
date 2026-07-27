@@ -1,0 +1,8 @@
+[
+  { "id": "dynamics", "label": "Dynamics" },
+  { "id": "reverb", "label": "Reverb & Delay" },
+  { "id": "eq", "label": "EQ & Filter" },
+  { "id": "modulation", "label": "Modulation" },
+  { "id": "distortion", "label": "Distortion & Saturation" },
+  { "id": "utility", "label": "Utility" }
+]
