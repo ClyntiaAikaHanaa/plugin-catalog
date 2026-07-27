@@ -1,5 +1,8 @@
 /node_modules
 
+# README tidak diterbitkan di repo ini.
+README.md
+
 # `dist/` adalah artefak build, dibangun ulang workflow deploy dari `src/`.
 #
 # Ia sempat ikut di-commit, dan itu keliru: `generated_at` berubah setiap kali
