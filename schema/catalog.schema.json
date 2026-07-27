@@ -23,6 +23,11 @@
       "type": "array",
       "items": { "$ref": "#/$defs/category" }
     },
+    "licenses": {
+      "type": "object",
+      "description": "Peta SPDX id → teks lisensi. Disimpan sekali, bukan per plugin.",
+      "additionalProperties": { "type": "string", "maxLength": 120000 }
+    },
     "plugins": {
       "type": "array",
       "items": { "$ref": "#/$defs/plugin" }

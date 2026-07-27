@@ -2,10 +2,17 @@
 // dispatch) dan `sync-repos.mjs` (semua plugin, dipicu jadwal).
 
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { SRC_PLUGINS, assertAllowedUrl, compareSemver, fetchAndHash } from "./lib.mjs";
+import {
+  SRC_LICENSES,
+  SRC_PLUGINS,
+  assertAllowedUrl,
+  compareSemver,
+  fetchAndHash,
+  licenseFileName,
+} from "./lib.mjs";
 
 /// Berapa banyak versi historis yang disimpan (Open Question Q5).
 ///
@@ -144,6 +151,37 @@ export function sanitizeReadme(markdown, repo, ref = "HEAD") {
       .trim()
       .slice(0, 80_000)
   );
+}
+
+/// Ambil teks lisensi repo.
+///
+/// Dibakukan ke katalog seperti README: dialog instalasi harus menampilkannya
+/// sebelum pengguna menyetujui, dan itu tidak boleh bergantung pada jaringan
+/// yang mungkin sedang mati.
+export async function fetchLicense(repo) {
+  const data = await githubJson(`https://api.github.com/repos/${repo}/license`);
+  if (!data?.content) return null;
+  const text = Buffer.from(data.content, "base64").toString("utf8");
+  return {
+    spdx: data.license?.spdx_id ?? null,
+    // Teks lisensi dirender apa adanya di blok bergulir, jadi tidak perlu
+    // dibersihkan seperti README — justru mengubahnya akan salah.
+    text: text.slice(0, 120_000),
+  };
+}
+
+/// Simpan teks lisensi ke `src/licenses/<spdx>.txt`, satu berkas per lisensi.
+///
+/// Ditulis hanya kalau belum ada: dua plugin GPL-3.0 menghasilkan teks yang
+/// identik, dan menulis ulang berkas yang sama setiap rilis hanya menghasilkan
+/// diff kosong yang mengaburkan riwayat.
+export async function storeLicense(spdx, text) {
+  if (!spdx || !text) return false;
+  await mkdir(SRC_LICENSES, { recursive: true });
+  const path = join(SRC_LICENSES, licenseFileName(spdx));
+  if (existsSync(path)) return false;
+  await writeFile(path, text);
+  return true;
 }
 
 /// Cari logo di repo untuk dipakai sebagai thumbnail.
@@ -312,6 +350,15 @@ export async function ingestRelease({
     if (readme) plugin.readme = readme;
   } catch (e) {
     console.warn(`  README ${repo} tidak terambil: ${e.message}`);
+  }
+  try {
+    const license = await fetchLicense(repo);
+    if (license?.spdx) {
+      plugin.license = license.spdx;
+      await storeLicense(license.spdx, license.text);
+    }
+  } catch (e) {
+    console.warn(`  lisensi ${repo} tidak terambil: ${e.message}`);
   }
   try {
     const logo = await findLogoUrl(repo);

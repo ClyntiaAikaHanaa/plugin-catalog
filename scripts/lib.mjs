@@ -7,6 +7,12 @@ import { fileURLToPath } from "node:url";
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const SRC_PLUGINS = join(ROOT, "src", "plugins");
+/// Teks lisensi disimpan sekali per SPDX id, bukan per plugin.
+///
+/// GPL-3.0 sendiri 35 KB. Menyalinnya ke setiap entri plugin membuat katalog
+/// tumbuh linear terhadap jumlah plugin padahal isinya identik — dan katalog
+/// itu diunduh ulang setiap kali TTL habis.
+export const SRC_LICENSES = join(ROOT, "src", "licenses");
 export const DIST = join(ROOT, "dist");
 
 /// Host yang boleh menjadi sumber unduhan.
@@ -62,6 +68,26 @@ export async function readPluginFiles() {
 
 export async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
+}
+
+/// Baca seluruh teks lisensi menjadi peta `SPDX id → teks`.
+export async function readLicenses() {
+  const out = {};
+  let names;
+  try {
+    names = await readdir(SRC_LICENSES);
+  } catch {
+    return out;
+  }
+  for (const name of names.filter((n) => n.endsWith(".txt")).sort()) {
+    out[name.replace(/\.txt$/, "")] = await readFile(join(SRC_LICENSES, name), "utf8");
+  }
+  return out;
+}
+
+/// Nama berkas lisensi dari SPDX id, dibersihkan agar aman sebagai nama berkas.
+export function licenseFileName(spdx) {
+  return `${String(spdx).replace(/[^A-Za-z0-9.+-]/g, "_")}.txt`;
 }
 
 /// True jika plugin layak masuk `catalog.json`.

@@ -11,7 +11,7 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 
-import { fetchReadme, findLogoUrl, pluginPath } from "./ingest.mjs";
+import { fetchLicense, fetchReadme, findLogoUrl, pluginPath, storeLicense } from "./ingest.mjs";
 import { readPluginFiles } from "./lib.mjs";
 
 const dryRun = process.argv.includes("--dry-run");
@@ -27,14 +27,23 @@ for (const { file, data } of plugins) {
 
   const readme = await fetchReadme(repo).catch(() => "");
   const logo = await findLogoUrl(repo).catch(() => null);
+  const license = await fetchLicense(repo).catch(() => null);
 
   console.log(
-    `${dryRun ? "·" : "↑"} ${file} — readme ${readme.length} byte, logo ${logo ?? "tidak ada"}`
+    `${dryRun ? "·" : "↑"} ${file} — readme ${readme.length} byte, ` +
+      `lisensi ${license?.spdx ?? "?"} ${license?.text.length ?? 0} byte, ` +
+      `logo ${logo ?? "tidak ada"}`
   );
   if (dryRun) continue;
 
   const current = JSON.parse(await readFile(pluginPath(data.id), "utf8"));
   if (readme) current.readme = readme;
   if (logo) current.icon_url = logo;
+  if (license?.spdx) {
+    current.license = license.spdx;
+    await storeLicense(license.spdx, license.text);
+  }
+  // Peninggalan dari saat teks lisensi disalin ke setiap entri plugin.
+  delete current.license_text;
   await writeFile(pluginPath(data.id), `${JSON.stringify(current, null, 2)}\n`);
 }

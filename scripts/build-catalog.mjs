@@ -11,7 +11,15 @@ import { cp, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { DIST, ROOT, isPublishable, ok, readJson, readPluginFiles } from "./lib.mjs";
+import {
+  DIST,
+  ROOT,
+  isPublishable,
+  ok,
+  readJson,
+  readLicenses,
+  readPluginFiles,
+} from "./lib.mjs";
 
 const launcher = await readJson(join(ROOT, "src", "launcher.json"));
 const dawProcesses = await readJson(join(ROOT, "src", "daw-processes.json"));
@@ -40,6 +48,13 @@ const catalog = {
   launcher,
   daw_processes: dawProcesses,
   categories,
+  // Hanya lisensi yang benar-benar dipakai plugin yang diterbitkan, supaya
+  // berkas lisensi yang tertinggal tidak ikut membebani setiap unduhan.
+  licenses: Object.fromEntries(
+    Object.entries(await readLicenses()).filter(([spdx]) =>
+      publishable.some((p) => p.data.license === spdx)
+    )
+  ),
   plugins: publishable.map((p) => p.data),
 };
 
