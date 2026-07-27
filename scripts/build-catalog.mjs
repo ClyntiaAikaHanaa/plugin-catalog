@@ -27,9 +27,16 @@ for (const { file } of pluginFiles.filter((p) => !isPublishable(p.data))) {
 const catalog = {
   schema_version: 1,
   generated_at: new Date().toISOString(),
-  // Dikendalikan server, bukan hardcoded di client — TTL dapat diperpendek
-  // saat merilis hotfix penting (§10.3).
-  catalog_ttl_seconds: 21600,
+  // TTL dikendalikan server, bukan hardcoded di client (§10.3) — justru supaya
+  // dapat diperpendek saat dibutuhkan.
+  //
+  // 5 menit selama katalog masih sering berubah. Dengan 6 jam (default FR-1.4),
+  // setiap perbaikan katalog tidak terlihat sampai pengguna menekan Refresh
+  // secara manual, dan itu membuat perubahan yang sudah benar tampak rusak.
+  //
+  // NAIKKAN kembali ke 21600 sebelum rilis publik: 5 menit berarti setiap
+  // launcher yang terbuka menembak katalog dua belas kali per jam.
+  catalog_ttl_seconds: 300,
   launcher,
   daw_processes: dawProcesses,
   categories,
