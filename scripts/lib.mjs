@@ -64,6 +64,17 @@ export async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
+/// True jika plugin layak masuk `catalog.json`.
+///
+/// Plugin yang terdaftar tapi belum punya rilis adalah keadaan yang sah: kamu
+/// menandai repo dengan topic, mengisi metadatanya, lalu rilis pertamanya
+/// menyusul. Yang tidak boleh adalah entri seperti itu bocor ke katalog —
+/// launcher menuntut `latest` ada, dan entri tanpa rilis akan dilewatinya
+/// sebagai data rusak. Lebih baik tidak diterbitkan sejak awal.
+export function isPublishable(plugin) {
+  return Boolean(plugin?.latest?.builds?.length);
+}
+
 /// Bandingkan dua semver. Sengaja tidak memakai perbandingan string: itu bug
 /// `1.10.0 < 1.9.0` yang persis kita hindari di launcher.
 export function compareSemver(a, b) {

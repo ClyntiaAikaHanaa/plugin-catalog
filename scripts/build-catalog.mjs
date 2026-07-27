@@ -11,12 +11,18 @@ import { cp, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { DIST, ROOT, ok, readJson, readPluginFiles } from "./lib.mjs";
+import { DIST, ROOT, isPublishable, ok, readJson, readPluginFiles } from "./lib.mjs";
 
 const launcher = await readJson(join(ROOT, "src", "launcher.json"));
 const dawProcesses = await readJson(join(ROOT, "src", "daw-processes.json"));
 const categories = await readJson(join(ROOT, "src", "categories.json"));
 const pluginFiles = await readPluginFiles();
+
+// Plugin yang belum punya rilis tidak diterbitkan (lihat `isPublishable`).
+const publishable = pluginFiles.filter((p) => isPublishable(p.data));
+for (const { file } of pluginFiles.filter((p) => !isPublishable(p.data))) {
+  console.log(`· ${file} belum punya rilis, tidak diterbitkan`);
+}
 
 const catalog = {
   schema_version: 1,
@@ -27,7 +33,7 @@ const catalog = {
   launcher,
   daw_processes: dawProcesses,
   categories,
-  plugins: pluginFiles.map((p) => p.data),
+  plugins: publishable.map((p) => p.data),
 };
 
 await mkdir(DIST, { recursive: true });

@@ -19,6 +19,7 @@ import {
   assertAllowedUrl,
   compareSemver,
   fail,
+  isPublishable,
   ok,
   readJson,
   readPluginFiles,
@@ -34,6 +35,13 @@ const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
 const validate = ajv.compile(schema);
 
+// Schema divalidasi terhadap katalog yang BENAR-BENAR akan diterbitkan, bukan
+// terhadap seluruh file sumber. Plugin yang belum punya rilis tidak ikut
+// diterbitkan (lihat `isPublishable`), jadi memaksanya memenuhi schema penuh —
+// yang mewajibkan `latest` — akan menolak keadaan yang sah.
+const published = pluginFiles.filter((p) => isPublishable(p.data));
+const pending = pluginFiles.filter((p) => !isPublishable(p.data));
+
 const candidate = {
   schema_version: 1,
   generated_at: new Date().toISOString(),
@@ -41,7 +49,7 @@ const candidate = {
   launcher,
   daw_processes: dawProcesses,
   categories,
-  plugins: pluginFiles.map((p) => p.data),
+  plugins: published.map((p) => p.data),
 };
 
 let failures = 0;
@@ -63,7 +71,7 @@ if (!validate(candidate)) {
 
 // 1. URL harus di allowlist host (dicek juga oleh launcher, §11.6).
 for (const { file, data } of pluginFiles) {
-  const releases = [data.latest, ...(data.history ?? [])];
+  const releases = [data.latest, ...(data.history ?? [])].filter(Boolean);
   for (const release of releases) {
     for (const build of release?.builds ?? []) {
       if (build.url === null) continue; // sah: plugin berbayar v2 (§20.3)
@@ -110,7 +118,7 @@ for (const { file, data } of pluginFiles) {
 }
 
 // 5. Versi `latest` harus lebih tinggi daripada semua versi di `history`.
-for (const { file, data } of pluginFiles) {
+for (const { file, data } of published) {
   for (const old of data.history ?? []) {
     try {
       if (compareSemver(old.version, data.latest.version) >= 0) {
@@ -131,7 +139,7 @@ for (const { file, data } of pluginFiles) {
 
 // 6. Setiap `min_launcher_version` harus ≤ `launcher.latest_version`.
 for (const { file, data } of pluginFiles) {
-  for (const release of [data.latest, ...(data.history ?? [])]) {
+  for (const release of [data.latest, ...(data.history ?? [])].filter(Boolean)) {
     const min = release?.min_launcher_version;
     if (!min) continue;
     try {
@@ -150,7 +158,7 @@ for (const { file, data } of pluginFiles) {
 // mengekstrak arsip lalu menolaknya karena entri akar tidak ditemukan — gagal
 // setelah unduhan selesai, yang adalah pengalaman terburuk.
 for (const { file, data } of pluginFiles) {
-  for (const release of [data.latest, ...(data.history ?? [])]) {
+  for (const release of [data.latest, ...(data.history ?? [])].filter(Boolean)) {
     for (const build of release?.builds ?? []) {
       const expectedSuffix = build.install_kind === "vst3_bundle" ? ".vst3" : ".clap";
       if (!build.archive_root.toLowerCase().endsWith(expectedSuffix)) {
@@ -163,7 +171,7 @@ for (const { file, data } of pluginFiles) {
 }
 
 // Rilis major harus ditandai breaking (§15.1). "Kalau ragu, tandai breaking."
-for (const { file, data } of pluginFiles) {
+for (const { file, data } of published) {
   const [major] = data.latest.version.split(".").map(Number);
   const previous = (data.history ?? [])[0];
   if (previous) {
@@ -181,4 +189,7 @@ if (failures > 0) {
   process.exit(1);
 }
 
-ok(`${pluginFiles.length} plugin tervalidasi`);
+ok(`${published.length} plugin diterbitkan, ${pluginFiles.length} file tervalidasi`);
+for (const { file } of pending) {
+  console.log(`  · ${file} menunggu rilis pertama`);
+}

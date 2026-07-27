@@ -1,0 +1,48 @@
+{
+  "id": "dihtortion",
+  "name": "Dihtortion",
+  "vendor": "AnakBaek DSP",
+  "category": "distortion",
+  "tagline": "Simulator amplifier gitar dan asymmetric wavefolder",
+  "description": "Dihtortion punya dua kepribadian, dipilih lewat toggle **AMP MODE**.\n\n*Raw distortion* adalah taman bermain waveshaping: delapan kurva transfer yang melewati satu mesin anti-aliasing. *Amp Mode* adalah amplifier gitar penuh dengan jalur amp yang dimodelkan secara fisik, empat cabinet, dan impulse response ruangan.\n\nDitulis dalam C++17 di atas JUCE 7.0.12.",
+  "homepage_url": "https://github.com/ClyntiaAikaHanaa/Dihtortion",
+  "source_url": "https://github.com/ClyntiaAikaHanaa/Dihtortion",
+  "license": "GPL-3.0",
+  "hidden": false,
+  "deprecated": false,
+  "deprecation_notice": null,
+  "commercial": {
+    "model": "free",
+    "requires_license": false,
+    "purchase_url": null
+  },
+  "latest": {
+    "version": "2.0.0",
+    "released_at": "2026-07-27T00:00:00Z",
+    "breaking": false,
+    "security": false,
+    "min_launcher_version": "1.0.0",
+    "changelog": "### 2.0.0\n- Rilis pertama yang dapat dipasang lewat Studio Hub",
+    "builds": [
+      {
+        "target": "windows-x86_64",
+        "format": "vst3",
+        "url": "https://github.com/ClyntiaAikaHanaa/Dihtortion/releases/download/v2.0.0/Dihtortion-2.0.0-win64.zip",
+        "size_bytes": 4853200,
+        "sha256": "c6ffc21d51360eb06023ec39032870bc2d2ed36973b5cd12c4aeebaf3faaeef2",
+        "archive_root": "Dihtortion.vst3",
+        "install_kind": "vst3_bundle",
+        "requires_vc_redist": true
+      }
+    ]
+  },
+  "user_data": {
+    "preset_paths": [],
+    "config_paths": []
+  },
+  "requirements": {
+    "os_min_build": 17763,
+    "cpu_features": ["sse2"],
+    "disk_bytes": 60000000
+  }
+}

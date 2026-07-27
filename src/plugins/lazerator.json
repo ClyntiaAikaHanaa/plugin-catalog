@@ -1,0 +1,48 @@
+{
+  "id": "lazerator",
+  "name": "Lazerator",
+  "vendor": "AnakBaek DSP",
+  "category": "modulation",
+  "tagline": "Dynamic transient smearing dan auto sweep phase modulator",
+  "description": "Efek fase kreatif. Deretan all-pass filter digerakkan detektor transient, sehingga setiap hit memicu sweep frekuensi eksponensialnya sendiri.\n\nPhase smearing sudah lama jadi bagian kosakata bass music; Lazerator membuatnya mengikuti dinamika materi, bukan LFO yang berjalan sendiri.\n\nDitulis dalam C++20 di atas JUCE 8.0.4.",
+  "homepage_url": "https://github.com/ClyntiaAikaHanaa/Lazerator",
+  "source_url": "https://github.com/ClyntiaAikaHanaa/Lazerator",
+  "license": "GPL-3.0",
+  "hidden": false,
+  "deprecated": false,
+  "deprecation_notice": null,
+  "commercial": {
+    "model": "free",
+    "requires_license": false,
+    "purchase_url": null
+  },
+  "latest": {
+    "version": "1.1.0",
+    "released_at": "2026-07-26T00:00:00Z",
+    "breaking": false,
+    "security": false,
+    "min_launcher_version": "1.0.0",
+    "changelog": "### 1.1.0\n- Rilis pertama yang dapat dipasang lewat Studio Hub",
+    "builds": [
+      {
+        "target": "windows-x86_64",
+        "format": "vst3",
+        "url": "https://github.com/ClyntiaAikaHanaa/Lazerator/releases/download/v1.1.0/Lazerator-1.1.0-win64.zip",
+        "size_bytes": 2785364,
+        "sha256": "3acb6650f604cd9d0772296529432e22118fe407c54413876c047d86580ddc86",
+        "archive_root": "Lazerator.vst3",
+        "install_kind": "vst3_bundle",
+        "requires_vc_redist": true
+      }
+    ]
+  },
+  "user_data": {
+    "preset_paths": ["%USERPROFILE%\\Documents\\Lazerator\\Presset"],
+    "config_paths": []
+  },
+  "requirements": {
+    "os_min_build": 17763,
+    "cpu_features": ["sse2"],
+    "disk_bytes": 40000000
+  }
+}

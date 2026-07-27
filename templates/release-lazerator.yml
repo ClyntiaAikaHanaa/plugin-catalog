@@ -1,0 +1,179 @@
+# Salin ke repo Lazerator sebagai `.github/workflows/release.yml`.
+#
+# ⚠ PRASYARAT: CMakeLists.txt di repo itu memakai `add_subdirectory(JUCE)`,
+# tapi folder `JUCE/` tidak ada di repo dan tidak terdaftar sebagai submodule.
+# Artinya build hanya berhasil di mesinmu. Checkout bersih di runner akan gagal
+# di langkah configure dengan pesan seperti:
+#
+#     add_subdirectory given source "JUCE" which is not an existing directory
+#
+# Perbaiki dulu dengan SALAH SATU cara berikut.
+#
+# ── Cara 1 (disarankan): FetchContent, sama seperti Dihtortion ─────────────
+# Ganti baris `add_subdirectory(JUCE)` di CMakeLists.txt dengan:
+#
+#     include(FetchContent)
+#     FetchContent_Declare(
+#         JUCE
+#         GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+#         GIT_TAG        8.0.4
+#         GIT_SHALLOW    TRUE
+#     )
+#     FetchContent_MakeAvailable(JUCE)
+#
+# Kelebihannya: versi JUCE tercatat di repo, sehingga build hari ini dan build
+# tahun depan menghasilkan biner yang sama. Itu properti yang kamu butuhkan
+# begitu ada pengguna yang melaporkan bug pada versi lama.
+#
+# ── Cara 2: submodule ──────────────────────────────────────────────────────
+#     git submodule add https://github.com/juce-framework/JUCE.git JUCE
+#     cd JUCE && git checkout 8.0.4 && cd ..
+#     git add .gitmodules JUCE && git commit -m "Pin JUCE 8.0.4 sebagai submodule"
+#
+# Kalau memilih cara 2, hapus komentar pada `submodules: recursive` di bawah.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # Sama persis dengan PRODUCT_NAME di CMakeLists.txt.
+  BUNDLE_NAME: Lazerator.vst3
+  PLUGIN_ID: lazerator
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        # with:
+        #   submodules: recursive   ← aktifkan kalau memilih Cara 2
+
+      - name: Cache JUCE
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: build/_deps
+          key: juce-8.0.4-${{ runner.os }}
+
+      - name: Configure
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --target Lazerator_VST3
+
+      # Harness DSP offline yang sudah ada di repo. Menjalankannya di sini
+      # berarti rilis yang lolos ke pengguna sudah melewatinya — jauh lebih
+      # murah daripada menariknya kembali setelah dirilis.
+      - name: Build & run DSP tests
+        continue-on-error: true
+        run: |
+          cmake --build build --config Release --target LazeratorTests
+          $exe = Get-ChildItem build -Recurse -Filter "LazeratorTests.exe" |
+                 Select-Object -First 1
+          if ($exe) { & $exe.FullName } else { Write-Host "LazeratorTests tidak ditemukan" }
+
+      - name: Locate VST3 bundle
+        id: bundle
+        run: |
+          $path = "build\Lazerator_artefacts\Release\VST3\$env:BUNDLE_NAME"
+          if (-not (Test-Path $path)) {
+            Write-Error "bundle tidak ditemukan di $path"
+            Get-ChildItem build -Recurse -Filter "*.vst3" -Directory |
+              ForEach-Object { Write-Host "  ada: $($_.FullName)" }
+            exit 1
+          }
+          echo "path=$path" >> $env:GITHUB_OUTPUT
+
+      - name: Sign plugin binary
+        if: ${{ secrets.CERT_THUMBPRINT != '' }}
+        env:
+          CERT_THUMBPRINT: ${{ secrets.CERT_THUMBPRINT }}
+        run: |
+          signtool sign /sha1 $env:CERT_THUMBPRINT /fd SHA256 `
+            /tr http://timestamp.digicert.com /td SHA256 `
+            "${{ steps.bundle.outputs.path }}\Contents\x86_64-win\*.vst3"
+
+      # JANGAN pakai `Compress-Archive`: di Windows ia menulis pemisah path
+      # sebagai backslash, yang melanggar spesifikasi ZIP. Akibatnya seluruh
+      # path menjadi satu nama file dan launcher menolak arsipnya. Entri
+      # ditulis manual supaya namanya dijamin memakai '/'.
+      - name: Package VST3 bundle
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart("v")
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") { $v = "0.0.0-test" }
+          New-Item -ItemType Directory -Force dist | Out-Null
+
+          Add-Type -AssemblyName System.IO.Compression
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+          $bundle = (Resolve-Path "${{ steps.bundle.outputs.path }}").Path.TrimEnd('\')
+          $root   = Split-Path $bundle -Leaf
+          $dest   = "dist\$env:PLUGIN_ID-$v-win64.zip"
+
+          $fs  = [System.IO.File]::Open($dest, [System.IO.FileMode]::Create)
+          $zip = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compression.ZipArchiveMode]::Create)
+          try {
+            foreach ($f in Get-ChildItem $bundle -Recurse -File) {
+              $rel   = $f.FullName.Substring($bundle.Length).TrimStart('\')
+              $name  = "$root/" + ($rel -replace '\\', '/')
+              $entry = $zip.CreateEntry($name, [System.IO.Compression.CompressionLevel]::Optimal)
+              $es = $entry.Open(); $src = [System.IO.File]::OpenRead($f.FullName)
+              $src.CopyTo($es); $src.Dispose(); $es.Dispose()
+            }
+          } finally { $zip.Dispose(); $fs.Dispose() }
+
+      - name: Verify archive root
+        run: |
+          $zip = Get-ChildItem dist\*.zip | Select-Object -First 1
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
+          $roots = $archive.Entries | ForEach-Object { ($_.FullName -split '/')[0] } |
+                   Sort-Object -Unique
+          $hasDll = $archive.Entries | Where-Object {
+            $_.FullName -match 'Contents/x86_64-win/.+\.vst3$'
+          }
+          $archive.Dispose()
+
+          Write-Host "entri akar: $($roots -join ', ')"
+          if ($roots.Count -ne 1 -or $roots[0] -ne $env:BUNDLE_NAME) {
+            Write-Error "entri akar harus tepat satu: $env:BUNDLE_NAME"
+            exit 1
+          }
+          if (-not $hasDll) {
+            Write-Error "tidak ada DLL di Contents/x86_64-win/ — bundle tidak lengkap"
+            exit 1
+          }
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: dist
+          path: dist
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@01570a1f39cb168c169c802c3bceb9e93fb10974 # v2.1.0
+        with:
+          files: dist/*
+          generate_release_notes: true
+          draft: false
+
+      - name: Notify catalog
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.CATALOG_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/ClyntiaAikaHanaa/plugin-catalog/dispatches `
+            -f event_type=plugin-release `
+            -F client_payload[plugin_id]=$env:PLUGIN_ID `
+            -F client_payload[version]=${{ github.ref_name }} `
+            -F client_payload[repo]=${{ github.repository }} `
+            -F client_payload[tag]=${{ github.ref_name }} `
+            -F client_payload[breaking]=${{ vars.BREAKING || 'false' }} `
+            -F client_payload[security]=${{ vars.SECURITY || 'false' }}

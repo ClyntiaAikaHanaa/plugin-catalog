@@ -144,9 +144,14 @@ export async function ingestRelease({
 
   const asset = pickWindowsAsset(data.assets ?? []);
   if (!asset) {
+    // Sebutkan asset yang benar-benar ada. "Tidak punya asset ZIP" saja
+    // membuat orang mengira rilisnya kosong, padahal masalahnya formatnya.
+    const names = (data.assets ?? []).map((a) => a.name);
     return {
       outcome: Outcome.Skipped,
-      reason: `rilis ${version} tidak punya asset ZIP`,
+      reason:
+        `rilis ${version} tidak punya asset ZIP berisi bundle .vst3` +
+        (names.length ? ` (yang ada: ${names.join(", ")})` : " (rilis tanpa asset)"),
     };
   }
 

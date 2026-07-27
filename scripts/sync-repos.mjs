@@ -68,7 +68,22 @@ for (const repo of repos) {
     }
 
     if (dryRun) {
-      console.log(`· ${full} → ${pluginId} @ ${release.tag_name} (dry run)`);
+      // Dry run tetap memeriksa asset-nya. Tanpa ini, dry run melaporkan
+      // "akan ditarik" untuk rilis yang sebenarnya akan dilewati — persis
+      // informasi yang membuat orang menjalankan run sungguhan lalu bingung
+      // kenapa katalognya tidak berubah.
+      const asset = (release.assets ?? []).find((a) => /\.zip$/i.test(a.name));
+      if (asset) {
+        console.log(`↑ ${full} → ${pluginId} @ ${release.tag_name} — ${asset.name}`);
+        updated += 1;
+      } else {
+        const names = (release.assets ?? []).map((a) => a.name).join(", ") || "tidak ada asset";
+        console.log(
+          `· ${full} @ ${release.tag_name} — tidak ada asset ZIP berisi bundle .vst3\n` +
+            `    yang ada: ${names}`
+        );
+        skipped += 1;
+      }
       continue;
     }
 
