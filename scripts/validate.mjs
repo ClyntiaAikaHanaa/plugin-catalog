@@ -9,7 +9,9 @@
 
 import { join } from "node:path";
 
-import Ajv from "ajv";
+// Entry point 2020-12, bukan `ajv` biasa — default export Ajv adalah draft-07
+// dan akan menolak `$schema` kita dengan "no schema with key or ref".
+import Ajv from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 
 import {
