@@ -82,7 +82,36 @@ export async function fetchReadme(repo) {
   const data = await githubJson(`https://api.github.com/repos/${repo}/readme`);
   if (!data?.content) return "";
   const raw = Buffer.from(data.content, "base64").toString("utf8");
-  return sanitizeReadme(raw);
+  return sanitizeReadme(raw, repo);
+}
+
+/// Ubah `<img src="...">` menjadi gambar bermarkdown berURL absolut.
+///
+/// Screenshot di README ditulis sebagai HTML dengan path relatif terhadap repo.
+/// Kalau tag HTML-nya dibuang mentah-mentah, yang tersisa hanya keterangannya —
+/// pengguna melihat judul "Distortion Mode" tanpa gambar apa pun di bawahnya.
+function absolutizeImages(markdown, repo, ref) {
+  const base = `https://raw.githubusercontent.com/${repo}/${ref}/`;
+
+  const toAbsolute = (src) => {
+    if (/^https?:\/\//i.test(src)) return src;
+    return base + src.replace(/^\.?\//, "");
+  };
+
+  return (
+    markdown
+      // HTML: <img src="..." alt="..."> dalam urutan atribut apa pun.
+      .replace(/<img\b[^>]*>/gi, (tag) => {
+        const src = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+        if (!src) return "";
+        const alt = /\balt\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] ?? "";
+        return `\n![${alt}](${toAbsolute(src)})\n`;
+      })
+      // Markdown dengan path relatif.
+      .replace(/!\[([^\]]*)\]\(([^)\s]+)([^)]*)\)/g, (_m, alt, src) => {
+        return `![${alt}](${toAbsolute(src)})`;
+      })
+  );
 }
 
 /// Buang apa yang tidak dapat dirender launcher, sisakan prosanya.
@@ -91,18 +120,25 @@ export async function fetchReadme(repo) {
 /// tidak ada gambar, tidak ada link (PRD §14.5). Membersihkannya di sini —
 /// sekali, di CI — lebih baik daripada menampilkan `<div align="center">`
 /// sebagai teks di setiap mesin pengguna.
-export function sanitizeReadme(markdown) {
+export function sanitizeReadme(markdown, repo, ref = "HEAD") {
   return (
     markdown
-      // Blok HTML mentah, termasuk <div>, <img>, <p align=...>.
-      .replace(/<\/?[a-z][^>]*>/gi, "")
-      // Badge shields.io dan gambar lain: tidak dapat dimuat, dan barisnya
-      // menjadi deretan tanda kurung yang tidak berarti.
-      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-      // Link dipertahankan teksnya saja.
-      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-      // Komentar HTML.
+      // Komentar HTML dulu, supaya <img> di dalamnya tidak ikut terangkat.
       .replace(/<!--[\s\S]*?-->/g, "")
+      // Gambar diselamatkan sebelum tag HTML dibuang.
+      .replace(/<img\b[^>]*>/gi, (tag) => absolutizeImages(tag, repo, ref))
+      // Sisa tag HTML: <div align>, <p>, <br>, dan sebagainya.
+      .replace(/<\/?[a-z][^>]*>/gi, "")
+      // Path gambar relatif menjadi absolut.
+      .replace(/!\[([^\]]*)\]\(([^)\s]+)([^)]*)\)/g, (m, alt, src) => {
+        if (/^https?:\/\//i.test(src)) return `![${alt}](${src})`;
+        return `![${alt}](https://raw.githubusercontent.com/${repo}/${ref}/${src.replace(/^\.?\//, "")})`;
+      })
+      // Badge shields.io: hiasan yang tidak menjelaskan apa pun tentang plugin,
+      // dan host-nya di luar allowlist sehingga tidak akan pernah termuat.
+      .replace(/!\[[^\]]*\]\(https?:\/\/img\.shields\.io[^)]*\)/g, "")
+      // Link biasa dipertahankan teksnya saja (launcher tidak merender link).
+      .replace(/(^|[^!])\[([^\]]+)\]\([^)]*\)/g, "$1$2")
       // Rapikan sisa baris kosong berlebih setelah penghapusan di atas.
       .replace(/\n{3,}/g, "\n\n")
       .trim()
