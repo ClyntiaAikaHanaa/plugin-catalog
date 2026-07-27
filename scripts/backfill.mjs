@@ -24,10 +24,9 @@ for (const { file, data } of plugins) {
     continue;
   }
   const repo = new URL(source).pathname.replace(/^\/+|\/+$/g, "");
-  const tag = data.latest?.version ? `v${data.latest.version}` : "HEAD";
 
   const readme = await fetchReadme(repo).catch(() => "");
-  const logo = await findLogoUrl(repo, tag).catch(() => null);
+  const logo = await findLogoUrl(repo).catch(() => null);
 
   console.log(
     `${dryRun ? "·" : "↑"} ${file} — readme ${readme.length} byte, logo ${logo ?? "tidak ada"}`

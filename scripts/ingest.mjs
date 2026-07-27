@@ -112,10 +112,13 @@ export function sanitizeReadme(markdown) {
 
 /// Cari logo di repo untuk dipakai sebagai thumbnail.
 ///
-/// URL menunjuk `raw.githubusercontent.com` pada tag rilis — host itu ada di
-/// allowlist unduhan, dan menyematkan tag berarti ikon tidak berubah diam-diam
-/// saat repo diperbarui.
-export async function findLogoUrl(repo, tag) {
+/// `ref` sengaja menunjuk branch utama, **bukan** tag rilis. Logo adalah
+/// identitas visual yang berlaku sekarang, bukan artefak yang harus cocok
+/// dengan versi tertentu — menyematkannya ke tag berarti logo yang kamu
+/// perbarui setelah merilis tidak akan pernah muncul. Tidak ada jaminan
+/// integritas yang hilang karenanya: berkasnya tetap divalidasi magic bytes
+/// oleh launcher, dan ia hanya dirender sebagai gambar.
+export async function findLogoUrl(repo, ref = "HEAD") {
   const candidates = [
     "screenshot/logo.png",
     "Screenshot/Logo.png",
@@ -126,7 +129,7 @@ export async function findLogoUrl(repo, tag) {
     "logo.png",
   ];
   for (const path of candidates) {
-    const url = `https://raw.githubusercontent.com/${repo}/${tag}/${encodeURI(path)}`;
+    const url = `https://raw.githubusercontent.com/${repo}/${ref}/${encodeURI(path)}`;
     try {
       const head = await fetch(url, {
         method: "HEAD",
@@ -275,7 +278,7 @@ export async function ingestRelease({
     console.warn(`  README ${repo} tidak terambil: ${e.message}`);
   }
   try {
-    const logo = await findLogoUrl(repo, data.tag_name ?? tag);
+    const logo = await findLogoUrl(repo);
     if (logo) plugin.icon_url = logo;
   } catch (e) {
     console.warn(`  logo ${repo} tidak terambil: ${e.message}`);
