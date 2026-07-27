@@ -73,6 +73,74 @@ export function newPluginStub(repo, pluginId) {
   };
 }
 
+/// Ambil README repo dan siapkan untuk renderer terbatas di launcher.
+///
+/// Dibakukan ke katalog saat ingest, bukan diambil saat aplikasi jalan:
+/// halaman detail tetap terbaca offline, dan membuka sebuah plugin tidak
+/// memicu request jaringan baru.
+export async function fetchReadme(repo) {
+  const data = await githubJson(`https://api.github.com/repos/${repo}/readme`);
+  if (!data?.content) return "";
+  const raw = Buffer.from(data.content, "base64").toString("utf8");
+  return sanitizeReadme(raw);
+}
+
+/// Buang apa yang tidak dapat dirender launcher, sisakan prosanya.
+///
+/// Launcher merender Markdown lewat allowlist sempit: tidak ada HTML mentah,
+/// tidak ada gambar, tidak ada link (PRD §14.5). Membersihkannya di sini —
+/// sekali, di CI — lebih baik daripada menampilkan `<div align="center">`
+/// sebagai teks di setiap mesin pengguna.
+export function sanitizeReadme(markdown) {
+  return (
+    markdown
+      // Blok HTML mentah, termasuk <div>, <img>, <p align=...>.
+      .replace(/<\/?[a-z][^>]*>/gi, "")
+      // Badge shields.io dan gambar lain: tidak dapat dimuat, dan barisnya
+      // menjadi deretan tanda kurung yang tidak berarti.
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      // Link dipertahankan teksnya saja.
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      // Komentar HTML.
+      .replace(/<!--[\s\S]*?-->/g, "")
+      // Rapikan sisa baris kosong berlebih setelah penghapusan di atas.
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+      .slice(0, 80_000)
+  );
+}
+
+/// Cari logo di repo untuk dipakai sebagai thumbnail.
+///
+/// URL menunjuk `raw.githubusercontent.com` pada tag rilis — host itu ada di
+/// allowlist unduhan, dan menyematkan tag berarti ikon tidak berubah diam-diam
+/// saat repo diperbarui.
+export async function findLogoUrl(repo, tag) {
+  const candidates = [
+    "screenshot/logo.png",
+    "Screenshot/Logo.png",
+    "screenshot/Logo.png",
+    "Screenshot/logo.png",
+    "assets/logo.png",
+    "docs/logo.png",
+    "logo.png",
+  ];
+  for (const path of candidates) {
+    const url = `https://raw.githubusercontent.com/${repo}/${tag}/${encodeURI(path)}`;
+    try {
+      const head = await fetch(url, {
+        method: "HEAD",
+        headers: { "user-agent": "studio-hub-catalog-ci" },
+      });
+      if (head.ok) return url;
+    } catch {
+      // Jaringan bermasalah untuk satu kandidat bukan alasan menggagalkan
+      // ingest — ikon hanyalah hiasan.
+    }
+  }
+  return null;
+}
+
 /// Pilih asset ZIP Windows x64.
 function pickWindowsAsset(assets) {
   const zips = assets.filter((a) => /\.zip$/i.test(a.name));
@@ -197,6 +265,21 @@ export async function ingestRelease({
     plugin.history = [plugin.latest, ...(plugin.history ?? [])].slice(0, HISTORY_LIMIT);
   }
   plugin.latest = newRelease;
+
+  // README dan logo disegarkan setiap rilis: keduanya berubah seiring plugin
+  // berkembang, dan yang ditampilkan launcher harus versi terbaru.
+  try {
+    const readme = await fetchReadme(repo);
+    if (readme) plugin.readme = readme;
+  } catch (e) {
+    console.warn(`  README ${repo} tidak terambil: ${e.message}`);
+  }
+  try {
+    const logo = await findLogoUrl(repo, data.tag_name ?? tag);
+    if (logo) plugin.icon_url = logo;
+  } catch (e) {
+    console.warn(`  logo ${repo} tidak terambil: ${e.message}`);
+  }
 
   await writeFile(path, `${JSON.stringify(plugin, null, 2)}\n`);
 
