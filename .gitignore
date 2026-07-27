@@ -1,1 +1,8 @@
 /node_modules
+
+# `dist/` adalah artefak build, dibangun ulang workflow deploy dari `src/`.
+#
+# Ia sempat ikut di-commit, dan itu keliru: `generated_at` berubah setiap kali
+# dibangun, jadi setiap rilis menghasilkan konflik di file yang sama. Sumber
+# kebenarannya adalah `src/`; yang tersaji di Pages dibangun dari situ.
+/dist
