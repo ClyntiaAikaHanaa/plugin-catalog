@@ -38,13 +38,17 @@ const catalog = {
   // TTL dikendalikan server, bukan hardcoded di client (§10.3) — justru supaya
   // dapat diperpendek saat dibutuhkan.
   //
-  // 5 menit selama katalog masih sering berubah. Dengan 6 jam (default FR-1.4),
-  // setiap perbaikan katalog tidak terlihat sampai pengguna menekan Refresh
-  // secara manual, dan itu membuat perubahan yang sudah benar tampak rusak.
+  // 6 jam (default FR-1.4). Sempat diturunkan ke 5 menit selama katalog masih
+  // sering berubah, tapi itu berarti setiap launcher yang terbuka menembak
+  // GitHub Pages dua belas kali per jam.
   //
-  // NAIKKAN kembali ke 21600 sebelum rilis publik: 5 menit berarti setiap
-  // launcher yang terbuka menembak katalog dua belas kali per jam.
-  catalog_ttl_seconds: 300,
+  // Konsekuensi yang perlu diingat: perbaikan katalog tidak langsung terlihat
+  // pengguna sampai TTL habis. Tombol Refresh di aplikasi memaksa pengambilan
+  // ulang, jadi itu jalan keluarnya saat menguji sesuatu.
+  //
+  // Nilai ini harus sama dengan yang di scripts/validate.mjs, yang memvalidasi
+  // katalog kandidat sebelum diterbitkan.
+  catalog_ttl_seconds: 21600,
   launcher,
   daw_processes: dawProcesses,
   categories,
