@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Hanya tampilkan apa yang akan berubah"
+        description: "Dry run — hanya tampilkan apa yang akan berubah, tanpa menulis atau deploy"
         type: boolean
         default: false
 
