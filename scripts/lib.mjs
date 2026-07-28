@@ -53,7 +53,17 @@ export function assertAllowedUrl(raw, context) {
 }
 
 export async function readPluginFiles() {
-  const names = (await readdir(SRC_PLUGINS)).filter((n) => n.endsWith(".json")).sort();
+  // Katalog tanpa satu pun entri adalah keadaan yang SAH: repo yang baru
+  // dibuat, atau semua entri sengaja dikosongkan untuk dibangun ulang sync.
+  // Melempar di sini membuat CI gagal sebelum sync sempat mengisi apa pun —
+  // yaitu tepat saat perkakas ini paling dibutuhkan.
+  let names;
+  try {
+    names = (await readdir(SRC_PLUGINS)).filter((n) => n.endsWith(".json")).sort();
+  } catch (e) {
+    if (e.code === "ENOENT") return [];
+    throw e;
+  }
   const plugins = [];
   for (const name of names) {
     const raw = await readFile(join(SRC_PLUGINS, name), "utf8");
