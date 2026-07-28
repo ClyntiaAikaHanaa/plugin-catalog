@@ -4,9 +4,13 @@
   "vendor": "AnakBaek DSP",
   "category": "modulation",
   "tagline": "Ring Modulator with Selectable Modulator Sources",
-  "tagline_i18n": {},
+  "tagline_i18n": {
+    "id": "Ring modulator dengan sumber modulator yang bisa dipilih"
+  },
   "description": "A VST3 effect for Windows. The input is multiplied by a modulator you choose: a band limited oscillator, filtered noise, the signal itself, or a sidechain input. Written in C++20 on JUCE. ![Ring Mood main window](https://raw.githubusercontent.com/ClyntiaAikaHanaa/Ring-Mood/HEAD/Screenshot/Main.png)",
-  "description_i18n": {},
+  "description_i18n": {
+    "id": "Sinyal masuk dikalikan dengan modulator pilihanmu: osilator band-limited, noise terfilter, sinyalnya sendiri, atau input sidechain.\n\nDitulis dalam C++20 di atas JUCE."
+  },
   "homepage_url": "https://github.com/ClyntiaAikaHanaa/Ring-Mood",
   "source_url": "https://github.com/ClyntiaAikaHanaa/Ring-Mood",
   "license": "GPL-3.0",

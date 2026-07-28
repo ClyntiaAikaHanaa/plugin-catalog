@@ -4,9 +4,13 @@
   "vendor": "AnakBaek DSP",
   "category": "reverb",
   "tagline": "Tempo Synced Delay with Tone Shaping, Ducking and Ping-Pong",
-  "tagline_i18n": {},
+  "tagline_i18n": {
+    "id": "Delay tempo-synced dengan tone shaping, ducking, dan ping-pong"
+  },
   "description": "A VST3 delay for Windows. The delay time lives on a visual timeline that draws the repeat pattern you are about to hear, so feedback, pan and bounce are things you can see rather than guess at. Written in C++20 on JUCE. ![DihLay interface](https://raw.githubusercontent.com/ClyntiaAikaHanaa/DihLay/HEAD/Screenshot/Main.png)",
-  "description_i18n": {},
+  "description_i18n": {
+    "id": "Delay dengan waktu tunda yang tergambar di atas timeline: pola pengulangan yang akan kamu dengar terlihat lebih dulu, sehingga feedback, pan, dan bounce jadi hal yang dilihat, bukan ditebak.\n\nDitulis dalam C++20 di atas JUCE 8.0.10."
+  },
   "homepage_url": "https://github.com/ClyntiaAikaHanaa/DihLay",
   "source_url": "https://github.com/ClyntiaAikaHanaa/DihLay",
   "license": "AGPL-3.0",

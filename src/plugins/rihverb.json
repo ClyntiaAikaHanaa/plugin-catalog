@@ -4,9 +4,13 @@
   "vendor": "AnakBaek DSP",
   "category": "reverb",
   "tagline": "Algorithmic Reverb with Swell and Tonal Drift",
-  "tagline_i18n": {},
+  "tagline_i18n": {
+    "id": "Reverb algoritmik dengan swell dan pergeseran warna"
+  },
   "description": "A VST3 reverb for Windows. An eight line feedback delay network fed alongside a tapped early reflection cluster, with two controls that ordinary reverbs do not have: Bloom pours the signal into the tank over time so the tail swells in, and Gravity sweeps the tone of the tail as it decays. Written in C++17 on JUCE. ![RihVerb main window](https://raw.githubusercontent.com/ClyntiaAikaHanaa/RihVerb/HEAD/Screenshot/Main.png)",
-  "description_i18n": {},
+  "description_i18n": {
+    "id": "Feedback delay network delapan jalur berdampingan dengan klaster early reflection, plus dua kendali yang tidak dimiliki reverb biasa: Bloom menuang sinyal ke dalam tangki secara bertahap sehingga ekornya mengembang, dan Gravity menggeser warna ekor sepanjang peluruhannya.\n\nDitulis dalam C++17 di atas JUCE."
+  },
   "homepage_url": "https://github.com/ClyntiaAikaHanaa/RihVerb",
   "source_url": "https://github.com/ClyntiaAikaHanaa/RihVerb",
   "license": "GPL-3.0",

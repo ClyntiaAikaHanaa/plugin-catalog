@@ -4,9 +4,13 @@
   "vendor": "AnakBaek DSP",
   "category": "distortion",
   "tagline": "A VST3 guitar amplifier simulator and asymmetric wavefolder for Windows.",
-  "tagline_i18n": {},
+  "tagline_i18n": {
+    "id": "Simulator amplifier gitar dan asymmetric wavefolder"
+  },
   "description": "**Eight shaper types, four cabinets, and a physically-modelled amp path, written in C++17 on JUCE.** ---",
-  "description_i18n": {},
+  "description_i18n": {
+    "id": "Dihtortion punya dua kepribadian, dipilih lewat toggle **AMP MODE**.\n\n*Raw distortion* adalah taman bermain waveshaping: delapan kurva transfer yang melewati satu mesin anti-aliasing. *Amp Mode* adalah amplifier gitar penuh dengan jalur amp yang dimodelkan secara fisik, empat cabinet, dan impulse response ruangan.\n\nDitulis dalam C++17 di atas JUCE 7.0.12."
+  },
   "homepage_url": "https://github.com/ClyntiaAikaHanaa/Dihtortion",
   "source_url": "https://github.com/ClyntiaAikaHanaa/Dihtortion",
   "license": "GPL-3.0",

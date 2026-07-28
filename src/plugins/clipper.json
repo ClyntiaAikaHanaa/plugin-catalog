@@ -4,9 +4,13 @@
   "vendor": "AnakBaek DSP",
   "category": "dynamics",
   "tagline": "Hard to Soft Clipper with a Live Transfer Curve",
-  "tagline_i18n": {},
+  "tagline_i18n": {
+    "id": "Clipper hard-to-soft dengan kurva transfer langsung"
+  },
   "description": "A VST3 distortion effect for Windows. One shaping function drives both the audio and the display, so the curve on screen is literally the curve the samples pass through. Written in C++20 on JUCE. ![Clipper main window](https://raw.githubusercontent.com/ClyntiaAikaHanaa/Clipper/HEAD/Screenshot/Main.png)",
-  "description_i18n": {},
+  "description_i18n": {
+    "id": "Satu fungsi pembentuk menggerakkan audio sekaligus tampilannya, jadi kurva di layar benar-benar kurva yang dilewati sampel — bukan sketsa kasar.\n\nDitulis dalam C++20 di atas JUCE."
+  },
   "homepage_url": "https://github.com/ClyntiaAikaHanaa/Clipper",
   "source_url": "https://github.com/ClyntiaAikaHanaa/Clipper",
   "license": "GPL-3.0",
