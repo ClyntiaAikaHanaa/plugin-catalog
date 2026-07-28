@@ -382,6 +382,44 @@ function pickWindowsAsset(assets) {
   return zips.find((a) => /win(64|dows)/i.test(a.name)) ?? zips[0] ?? null;
 }
 
+/// Pilih installer `.exe` milik vendor, kalau rilisnya memang hanya itu.
+///
+/// Namanya harus memuat "setup" atau "install". Syarat itu bukan hiasan: tanpa
+/// itu, rilis yang lupa mengunggah ZIP-nya tapi menyertakan `.exe` apa pun akan
+/// diam-diam berubah menjadi entri yang tidak dapat dipasang launcher, dan
+/// pemiliknya tidak akan tahu sampai ada yang mengeluh. Dengan syarat ini,
+/// hanya rilis yang memang sengaja mendistribusikan installer yang lolos.
+function pickInstallerAsset(assets) {
+  return (
+    assets.find((a) => /\.exe$/i.test(a.name) && /(setup|install)/i.test(a.name)) ?? null
+  );
+}
+
+/// Segarkan README, lisensi, dan logo dari repo.
+///
+/// Ketiganya berubah seiring plugin berkembang, jadi diambil setiap rilis dan
+/// bukan hanya saat entri dibuat. Dipisah jadi fungsi sendiri karena jalur
+/// instalasi terkelola dan jalur installer vendor sama-sama membutuhkannya —
+/// yang berbeda antara keduanya hanya build, bukan metadatanya.
+async function refreshRepoMetadata(plugin, repo, readme) {
+  if (readme) plugin.readme = readme;
+  try {
+    const license = await fetchLicense(repo);
+    if (license?.spdx) {
+      plugin.license = license.spdx;
+      await storeLicense(license.spdx, license.text);
+    }
+  } catch (e) {
+    console.warn(`  lisensi ${repo} tidak terambil: ${e.message}`);
+  }
+  try {
+    const logo = await findLogoUrl(repo);
+    if (logo) plugin.icon_url = logo;
+  } catch (e) {
+    console.warn(`  logo ${repo} tidak terambil: ${e.message}`);
+  }
+}
+
 /// Body rilis GitHub sering memuat boilerplate. Yang dipakai launcher adalah
 /// bagian yang benar-benar menjelaskan perubahan.
 function normalizeChangelog(body, version) {
@@ -459,6 +497,46 @@ export async function ingestRelease({
   }
 
   const asset = pickWindowsAsset(data.assets ?? []);
+
+  // ── Plugin yang mendistribusikan installer sendiri ─────────────────────
+  //
+  // Entrinya tetap dibuat penuh — README, logo, lisensi, metadata — supaya
+  // halaman detail di launcher terlihat sama seperti plugin lain. Yang tidak ada
+  // adalah `builds`, dan `release_page_url` yang mengisi tempatnya membuat
+  // launcher mengarahkan pengguna ke halaman rilis alih-alih memasang apa pun.
+  //
+  // Studio Hub tidak mengunduh, memverifikasi, atau menjalankan installer siapa
+  // pun. Itu keputusan sadar: begitu kami mengeksekusi installer pihak lain,
+  // tiga dari empat jaminan instalasi kami jadi tidak dapat ditepati, dan lebih
+  // baik jujur bahwa plugin ini di luar cakupan daripada berpura-pura
+  // mengelolanya.
+  const installer = asset ? null : pickInstallerAsset(data.assets ?? []);
+  if (installer) {
+    plugin.release_page_url = data.html_url;
+    if (plugin.latest) {
+      plugin.history = [plugin.latest, ...(plugin.history ?? [])].slice(0, HISTORY_LIMIT);
+    }
+    plugin.latest = {
+      version,
+      released_at: data.published_at ?? new Date().toISOString(),
+      breaking: breaking === true || breaking === "true",
+      security: security === true || security === "true",
+      min_launcher_version: plugin.latest?.min_launcher_version ?? "1.0.0",
+      changelog: normalizeChangelog(data.body, version),
+      builds: [],
+    };
+
+    await mkdir(SRC_PLUGINS, { recursive: true });
+    await refreshRepoMetadata(plugin, repo, readme);
+    await writeFile(path, `${JSON.stringify(plugin, null, 2)}\n`);
+
+    return {
+      outcome: created ? Outcome.Created : Outcome.Updated,
+      version,
+      reason: `installer sendiri (${installer.name}); launcher mengarah ke halaman rilis`,
+    };
+  }
+
   if (!asset) {
     // Sebutkan asset yang benar-benar ada. "Tidak punya asset ZIP" saja
     // membuat orang mengira rilisnya kosong, padahal masalahnya formatnya.
@@ -536,24 +614,7 @@ export async function ingestRelease({
   // keadaan di mana sync menjadi satu-satunya jalan memulihkan katalog.
   await mkdir(SRC_PLUGINS, { recursive: true });
 
-  // README dan logo disegarkan setiap rilis: keduanya berubah seiring plugin
-  // berkembang, dan yang ditampilkan launcher harus versi terbaru.
-  if (readme) plugin.readme = readme;
-  try {
-    const license = await fetchLicense(repo);
-    if (license?.spdx) {
-      plugin.license = license.spdx;
-      await storeLicense(license.spdx, license.text);
-    }
-  } catch (e) {
-    console.warn(`  lisensi ${repo} tidak terambil: ${e.message}`);
-  }
-  try {
-    const logo = await findLogoUrl(repo);
-    if (logo) plugin.icon_url = logo;
-  } catch (e) {
-    console.warn(`  logo ${repo} tidak terambil: ${e.message}`);
-  }
+  await refreshRepoMetadata(plugin, repo, readme);
 
   await writeFile(path, `${JSON.stringify(plugin, null, 2)}\n`);
 

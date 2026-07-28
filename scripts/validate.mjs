@@ -82,6 +82,27 @@ for (const { file, data } of pluginFiles) {
       }
     }
   }
+  // Setiap rilis harus punya minimal satu build, KECUALI plugin yang memang
+  // tidak kami pasang sendiri.
+  //
+  // Aturan ini dulu ada di JSON Schema sebagai `minItems: 1`, tapi schema tidak
+  // dapat menyatakan "kecuali kalau release_page_url terisi" dengan cara yang
+  // masih terbaca. Dipindah ke sini supaya pengecualiannya eksplisit: plugin
+  // dengan `release_page_url` sengaja tidak punya build, sedangkan plugin biasa
+  // tanpa build hampir selalu berarti aset rilisnya gagal terbaca — dan itu
+  // harus menggagalkan build katalog, bukan diterbitkan sebagai entri yang tidak
+  // dapat dipasang siapa pun.
+  if (!data.release_page_url) {
+    for (const release of [data.latest, ...(data.history ?? [])].filter(Boolean)) {
+      if ((release.builds ?? []).length === 0) {
+        reject(
+          `${file} rilis ${release.version} tidak punya build ` +
+            `(kalau plugin ini memang dipasang lewat installer sendiri, set release_page_url)`
+        );
+      }
+    }
+  }
+
   for (const url of [data.icon_url, data.homepage_url, data.source_url, ...(data.screenshots ?? [])]) {
     if (!url) continue;
     try {
