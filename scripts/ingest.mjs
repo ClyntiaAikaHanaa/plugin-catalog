@@ -445,6 +445,12 @@ export async function ingestRelease({
   }
   plugin.latest = newRelease;
 
+  // Git tidak melacak direktori kosong, jadi setelah seluruh entri dihapus,
+  // `src/plugins` tidak ada sama sekali di checkout bersih. Membuatnya di sini
+  // membuat regenerasi penuh dari nol berhasil — dan itu justru satu-satunya
+  // keadaan di mana sync menjadi satu-satunya jalan memulihkan katalog.
+  await mkdir(SRC_PLUGINS, { recursive: true });
+
   // README dan logo disegarkan setiap rilis: keduanya berubah seiring plugin
   // berkembang, dan yang ditampilkan launcher harus versi terbaru.
   if (readme) plugin.readme = readme;

@@ -11,7 +11,7 @@
 //   node scripts/fetch-release.mjs --plugin mycomp --repo akun/MyComp \
 //        --tag v1.3.0 [--breaking true] [--security true]
 
-import { Outcome, ingestRelease } from "./ingest.mjs";
+import { KNOWN_CATEGORIES, Outcome, ingestRelease } from "./ingest.mjs";
 
 const args = parseArgs(process.argv.slice(2));
 for (const required of ["plugin", "repo", "tag"]) {
@@ -42,10 +42,18 @@ console.log(
 );
 
 if (result.outcome === Outcome.Created) {
-  console.log(
-    `  File plugin baru dibuat dengan hidden:true. Sunting kategori dan\n` +
-      `  requirements-nya, lalu set hidden:false supaya tampil di launcher.`
-  );
+  if (result.hidden) {
+    console.log(
+      `  Entri baru dibuat TERSEMBUNYI: kategori tidak dapat ditentukan dari\n` +
+        `  repo. Tambahkan salah satu topic berikut, lalu jalankan lagi:\n` +
+        `    ${KNOWN_CATEGORIES.join(", ")}`
+    );
+  } else {
+    console.log(
+      `  Entri baru dibuat, kategori "${result.category}". Semua metadata\n` +
+        `  diturunkan dari repo; yang tersisa hanya terjemahan Indonesia.`
+    );
+  }
 }
 
 function parseArgs(argv) {
