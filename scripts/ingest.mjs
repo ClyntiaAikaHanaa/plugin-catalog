@@ -54,6 +54,82 @@ export function pluginPath(pluginId) {
   return join(SRC_PLUGINS, `${pluginId}.json`);
 }
 
+/// Nama berkas manifes yang boleh diletakkan di akar repo plugin.
+export const MANIFEST_NAMES = ["studio-hub.json", ".studio-hub.json"];
+
+/// Ambil manifes opsional dari repo plugin.
+///
+/// Ini tempat untuk segala sesuatu yang tidak dapat disimpulkan dari kode:
+/// terjemahan, lokasi preset, kebutuhan CPU. Diletakkan di repo plugin, bukan
+/// di katalog, karena yang tahu jawabannya adalah orang yang menulis plugin
+/// itu — dan karena isinya lalu ikut ter-review bersama perubahan kodenya.
+export async function fetchPluginManifest(repo, ref = "HEAD") {
+  for (const name of MANIFEST_NAMES) {
+    try {
+      const res = await fetch(`https://raw.githubusercontent.com/${repo}/${ref}/${name}`, {
+        headers: { "user-agent": "studio-hub-catalog-ci" },
+      });
+      if (!res.ok) continue;
+      return JSON.parse(await res.text());
+    } catch (e) {
+      // Manifes rusak tidak boleh menggagalkan rilis; ia hanya pelengkap.
+      console.warn(`  manifes ${repo}/${name} diabaikan: ${e.message}`);
+    }
+  }
+  return null;
+}
+
+/// Terapkan manifes ke entri plugin.
+///
+/// Manifes MENANG atas nilai turunan dan atas isi katalog sebelumnya, dan
+/// diterapkan ulang setiap rilis. Konsekuensinya disengaja: repo plugin jadi
+/// satu-satunya sumber kebenaran untuk field ini, dan menyuntingnya di katalog
+/// tidak akan bertahan. Satu tempat yang benar lebih baik daripada dua tempat
+/// yang bisa berbeda diam-diam.
+export function applyManifest(plugin, manifest) {
+  if (!manifest || typeof manifest !== "object") return plugin;
+
+  if (typeof manifest.vendor === "string") plugin.vendor = manifest.vendor;
+  if (typeof manifest.name === "string") plugin.name = manifest.name;
+
+  if (typeof manifest.category === "string") {
+    if (KNOWN_CATEGORIES.includes(manifest.category)) {
+      plugin.category = manifest.category;
+    } else {
+      console.warn(
+        `  kategori "${manifest.category}" di manifes tidak dikenal; ` +
+          `pilihan: ${KNOWN_CATEGORIES.join(", ")}`
+      );
+    }
+  }
+
+  // Teks bawaan berbahasa Inggris; terjemahan per kode bahasa.
+  if (typeof manifest.tagline === "string") plugin.tagline = manifest.tagline.slice(0, 200);
+  if (typeof manifest.description === "string") plugin.description = manifest.description;
+  if (manifest.tagline_i18n && typeof manifest.tagline_i18n === "object") {
+    plugin.tagline_i18n = manifest.tagline_i18n;
+  }
+  if (manifest.description_i18n && typeof manifest.description_i18n === "object") {
+    plugin.description_i18n = manifest.description_i18n;
+  }
+
+  // Path preset: launcher WAJIB tidak menyentuhnya saat update, dan menanyakan
+  // sebelum menghapusnya saat uninstall (FR-4.10, FR-5.2). Hanya plugin yang
+  // tahu di mana ia menyimpannya.
+  if (manifest.user_data && typeof manifest.user_data === "object") {
+    plugin.user_data = {
+      preset_paths: manifest.user_data.preset_paths ?? [],
+      config_paths: manifest.user_data.config_paths ?? [],
+    };
+  }
+
+  if (manifest.requirements && typeof manifest.requirements === "object") {
+    plugin.requirements = { ...plugin.requirements, ...manifest.requirements };
+  }
+
+  return plugin;
+}
+
 /// Kategori dikenali dari topic repo, mis. topic `reverb` → kategori `reverb`.
 ///
 /// Ini satu-satunya metadata yang benar-benar butuh penilaian manusia, dan
@@ -347,9 +423,11 @@ export async function ingestRelease({
   let plugin;
   let created = false;
 
-  // README diambil lebih dulu: entri baru menurunkan judul, tagline, dan
-  // paragraf pembukanya dari sana.
+  // README dan manifes diambil lebih dulu: entri baru menurunkan judul,
+  // tagline, dan paragraf pembukanya dari README, lalu manifes menimpa apa
+  // pun yang dinyatakan eksplisit di repo plugin.
   const readme = await fetchReadme(repo).catch(() => "");
+  const manifest = await fetchPluginManifest(repo).catch(() => null);
 
   if (existsSync(path)) {
     plugin = JSON.parse(await readFile(path, "utf8"));
@@ -358,6 +436,13 @@ export async function ingestRelease({
     if (!meta) throw new Error(`repo ${repo} tidak ditemukan`);
     plugin = await newPluginStub(meta, pluginId, readme);
     created = true;
+  }
+
+  // Diterapkan setiap rilis, bukan hanya saat entri dibuat: mengubah manifes
+  // di repo plugin harus sampai ke katalog tanpa menyentuh katalognya.
+  applyManifest(plugin, manifest);
+  if (manifest?.category && KNOWN_CATEGORIES.includes(manifest.category)) {
+    plugin.hidden = false;
   }
 
   const data = release ?? (await githubJson(`https://api.github.com/repos/${repo}/releases/tags/${tag}`));

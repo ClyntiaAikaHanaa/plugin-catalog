@@ -1,0 +1,56 @@
+{
+  "_": [
+    "Salin berkas ini ke AKAR repo plugin sebagai studio-hub.json.",
+    "",
+    "Isinya adalah segala sesuatu yang tidak dapat disimpulkan dari kode:",
+    "terjemahan, kategori, lokasi preset, dan kebutuhan CPU. Katalog membacanya",
+    "setiap rilis, jadi mengubahnya di sini cukup — tidak perlu menyentuh repo",
+    "plugin-catalog sama sekali.",
+    "",
+    "Semua field opsional. Yang tidak diisi diturunkan dari README, CMakeLists,",
+    "dan topic repo seperti biasa.",
+    "",
+    "Kunci yang diawali garis bawah diabaikan; hapus blok ini kalau mau."
+  ],
+
+  "category": "reverb",
+  "_category": "Salah satu: dynamics, reverb, eq, modulation, distortion, utility. Mengisinya di sini membuat topic kategori tidak lagi diperlukan.",
+
+  "tagline_i18n": {
+    "id": "Reverb algoritmik dengan swell dan pergeseran warna"
+  },
+  "description_i18n": {
+    "id": "Deskripsi panjang dalam Bahasa Indonesia. Teks Inggrisnya diambil dari paragraf pembuka README, jadi yang perlu ditulis di sini hanya terjemahannya."
+  },
+
+  "user_data": {
+    "preset_paths": ["%USERPROFILE%\\Documents\\NamaPlugin\\Presets"],
+    "config_paths": []
+  },
+  "_user_data": [
+    "Folder milik PENGGUNA, bukan milik plugin. Launcher tidak pernah menyentuhnya",
+    "saat update, dan menanyakan lebih dulu sebelum menghapusnya saat uninstall.",
+    "Kosongkan kalau plugin tidak menyimpan apa pun di luar bundle-nya.",
+    "",
+    "Salah mengisi ini berakibat nyata: path yang keliru berarti preset pengguna",
+    "TIDAK terlindungi, dan mereka baru tahu setelah kehilangannya."
+  ],
+
+  "requirements": {
+    "os_min_build": 17763,
+    "cpu_features": ["sse2"],
+    "disk_bytes": 30000000
+  },
+  "_requirements": [
+    "os_min_build 17763 = Windows 10 1809, batas bawah yang didukung Studio Hub.",
+    "cpu_features memblokir instalasi di prosesor yang tidak mampu — jauh lebih",
+    "baik daripada plugin yang crash saat DAW memuatnya. Isi sesuai flag yang",
+    "benar-benar dipakai build-mu; salah tulis di sini membuat plugin ditolak di",
+    "mesin yang sebenarnya sanggup.",
+    "",
+    "disk_bytes termasuk ruang staging saat pemasangan."
+  ],
+
+  "vendor": "AnakBaek DSP",
+  "_vendor": "Opsional. Kalau kosong, diambil dari COMPANY_NAME di CMakeLists.txt."
+}
