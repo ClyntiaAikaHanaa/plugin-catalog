@@ -1,0 +1,53 @@
+{
+  "id": "clipper",
+  "name": "Clipper",
+  "vendor": "AnakBaek DSP",
+  "category": "dynamics",
+  "tagline": "Hard to Soft Clipper with a Live Transfer Curve",
+  "tagline_i18n": {},
+  "description": "A VST3 distortion effect for Windows. One shaping function drives both the audio and the display, so the curve on screen is literally the curve the samples pass through. Written in C++20 on JUCE. ![Clipper main window](https://raw.githubusercontent.com/ClyntiaAikaHanaa/Clipper/HEAD/Screenshot/Main.png)",
+  "description_i18n": {},
+  "homepage_url": "https://github.com/ClyntiaAikaHanaa/Clipper",
+  "source_url": "https://github.com/ClyntiaAikaHanaa/Clipper",
+  "license": "GPL-3.0",
+  "hidden": false,
+  "deprecated": false,
+  "deprecation_notice": null,
+  "commercial": {
+    "model": "free",
+    "requires_license": false,
+    "purchase_url": null
+  },
+  "user_data": {
+    "preset_paths": [],
+    "config_paths": []
+  },
+  "requirements": {
+    "os_min_build": 17763,
+    "cpu_features": [
+      "sse2"
+    ]
+  },
+  "latest": {
+    "version": "1.0.0",
+    "released_at": "2026-07-28T14:11:47Z",
+    "breaking": false,
+    "security": false,
+    "min_launcher_version": "1.0.0",
+    "changelog": "### 1.0.0\n",
+    "builds": [
+      {
+        "target": "windows-x86_64",
+        "format": "vst3",
+        "url": "https://github.com/ClyntiaAikaHanaa/Clipper/releases/download/v1.0.0/Clipper-1.0.0-win64.zip",
+        "size_bytes": 1904809,
+        "sha256": "786dd771e1d8adcffaef5f27636c8dc2acb8a5bfbecabea71e29fea052691237",
+        "archive_root": "Clipper.vst3",
+        "install_kind": "vst3_bundle",
+        "requires_vc_redist": true
+      }
+    ]
+  },
+  "readme": "![Clipper logo](https://raw.githubusercontent.com/ClyntiaAikaHanaa/Clipper/HEAD/Screenshot/Logo.png)\n\n# Clipper\n\n**Hard to Soft Clipper with a Live Transfer Curve**\n\nA VST3 distortion effect for Windows. One shaping function drives both the audio and the\ndisplay, so the curve on screen is literally the curve the samples pass through. Written in\nC++20 on JUCE.\n\n![Clipper main window](https://raw.githubusercontent.com/ClyntiaAikaHanaa/Clipper/HEAD/Screenshot/Main.png)\n\n## What it does\n\nClipping is the bluntest tool in the mixing box and still one of the most used: cut the\npeaks, get the loudness back, and pick up some harmonics on the way. Most clippers either\nhide the shape behind a single drive knob or draw a curve that is only a rough sketch of\nwhat the DSP is doing.\n\nClipper shows the real thing. The transfer function you drag is the function the audio\nthread calls, sample for sample, and the waveform behind it is the actual output of the\nplugin rather than a redrawn approximation.\n\nThree things shape the design:\n\n1. **One shaping function, two consumers.** `clipper::dsp::clip()` is header only and free\n   of JUCE types, so the audio thread and the display call the same code. The picture and\n   the sound cannot drift apart.\n2. **The ceiling is a guarantee.** Oversampled clipping alone leaves ripple and a few\n   percent of overshoot past the threshold once the signal is filtered back down. A second\n   clamp at the base rate restores the flat tops and makes the ceiling real.\n3. **Small on purpose.** Four parameters, one window, no preset browser. It is meant to be\n   dropped on a bus and set in ten seconds.\n\n## Features\n\n### Engine\n\n* Piecewise quadratic knee, chosen so that knee at 0 percent is exactly hard clipping with\n  no special case, unity slope is kept until the signal approaches the ceiling, and the\n  curve reaches the ceiling at a finite input instead of only asymptotically.\n* C1 continuous at both joins, so nothing kinks audibly as the signal crosses into the knee.\n* 2x oversampling around the shaping stage using the polyphase IIR half band pair. That is\n  a minimum phase filter, so latency stays a fraction of a sample instead of the dozens a\n  linear phase FIR would cost, and whatever it does report is forwarded to the host so\n  delay compensation stays correct.\n* Base rate clamp after downsampling, which flattens the tops the reconstruction filter\n  rounded off and stops peaks landing above the ceiling the user set.\n* All four controls smoothed over 5 ms at the oversampled rate, so a hard automation jump\n  cannot click.\n* Denormals disabled on the audio thread, so a long silence costs nothing.\n\n### Controls\n\n| Control | Range | What it does |\n| --- | --- | --- |\n| In Gain | -24 to +24 dB | Level going into the clipper. More drive, more distortion. |\n| Knee | 0 to 100 percent | Shape of the clip, from a hard corner to a soft rounded knee. |\n| Out Gain | -24 to +24 dB | Level after clipping, for matching the loudness back. |\n| Ceiling | -24 to 0 dB | How far the signal is allowed to go. Dragged from the display. |\n\n### Display\n\n* Transfer curve sampled once per pixel, so the knee stays smooth at any window size.\n* Live output waveform behind the curve, drawn on the same vertical scale, so the ceiling\n  rules land exactly where the trace is being flattened.\n* Bins the clipper is currently holding are picked out brighter, so the moment the signal\n  starts squaring off is visible rather than inferred.\n* Two triangle markers set the ceiling by dragging. Double click either one to return it to\n  full scale.\n* The plot covers the clipping stage only. Out Gain is a separate stage after it and\n  deliberately does not move anything in the panel, so the markers stay put and a drag\n  lands on the value under the cursor.\n* Status bar describes whatever is under the mouse.\n\n### Interface\n\n* Resizable from 70 percent to 250 percent by dragging the bottom right corner.\n* The aspect ratio is locked and the whole panel is drawn at its design size and scaled by\n  a single transform, so every knob, arc, glyph and caption keeps its exact proportion at\n  any size. No control carries a size or DPI branch of its own.\n* The window size is stored with the project, so the editor reopens where it was left.\n* Double click any knob to return it to its default.\n\n## Project layout\n\n```\nSource/\n  ClipperDSP.h      the shaping function, shared by the audio thread and the display\n  Params.*          parameter IDs, ranges, formatting and status bar copy\n  PluginProcessor.* oversampling, gain staging, output scope, state\n  PluginEditor.*    resizable shell, single transform scaling\n  MainPanel.*       title bar, layout, status bar\n  CurveDisplay.*    transfer curve, output waveform, ceiling handles\n  Widgets.h         arc knob and the brand mark\n  ClipperTheme.h    palette, fonts and shared dimensions\nTools/\n  logoexport.cpp    brand asset export\nScreenshot/\n  Main.png\n  Logo.png\n  make_logo.ps1\n```\n\nClipper shares its palette and layout language with the rest of the series, so it sits at\nthe same size on screen and reads as the same family.\n\n## Licence\n\nClipper is released under the **GNU General Public License version 3**. See\nLICENSE for the full text.\n\nThis means you may use, study, modify and redistribute the code, provided that derivative\nworks are also released under the GPL and that you keep the source available.\n\n## Third party notices\n\n**JUCE.** This project builds against JUCE, which is dual licensed\nunder the GPLv3 and a commercial licence. Releasing Clipper under the GPLv3 relies on the\nGPLv3 option. If you distribute binaries under that option, the JUCE splash screen has to\nstay enabled unless you hold a commercial JUCE licence. JUCE itself is not included in this\nrepository and keeps its own licence.\n\n**VST3.** VST is a registered trademark of Steinberg Media Technologies GmbH. The VST3 SDK\nships inside JUCE and is licensed by Steinberg under either the GPLv3 or a proprietary\nagreement. This project uses the GPLv3 option. Steinberg also requires anyone distributing\nVST3 binaries to register as a VST3 developer and to accept the VST3 licensing terms.\nNeither Steinberg nor Clipper are affiliated with or endorsed by each other.\n\nProduct names, logos and brands mentioned anywhere in this project belong to their\nrespective owners and are used for identification only.",
+  "icon_url": "https://raw.githubusercontent.com/ClyntiaAikaHanaa/Clipper/HEAD/Screenshot/Logo.png"
+}
