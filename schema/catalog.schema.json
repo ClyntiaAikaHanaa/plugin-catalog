@@ -39,6 +39,17 @@
       "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-.]+)?$"
     },
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "i18n_short": {
+      "type": "object",
+      "description": "Terjemahan per kode bahasa. Teks bawaan di field induknya berbahasa Inggris dan dipakai untuk bahasa yang belum diterjemahkan.",
+      "propertyNames": { "pattern": "^[a-z]{2}(-[A-Z]{2})?$" },
+      "additionalProperties": { "type": "string", "maxLength": 200 }
+    },
+    "i18n_long": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z]{2}(-[A-Z]{2})?$" },
+      "additionalProperties": { "type": "string", "maxLength": 20000 }
+    },
     "https_url": {
       "type": "string",
       "format": "uri",
@@ -162,7 +173,9 @@
         "vendor": { "type": "string", "minLength": 1, "maxLength": 200 },
         "category": { "type": "string", "pattern": "^[a-z0-9-]{2,32}$" },
         "tagline": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "tagline_i18n": { "$ref": "#/$defs/i18n_short" },
         "description": { "type": "string", "maxLength": 20000 },
+        "description_i18n": { "$ref": "#/$defs/i18n_long" },
         "readme": { "type": "string", "maxLength": 80000 },
         "icon_url": { "$ref": "#/$defs/https_url" },
         "screenshots": {
