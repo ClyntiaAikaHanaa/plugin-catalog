@@ -142,7 +142,78 @@ export async function fetchAndHash(url) {
     throw new Error(`gagal mengunduh ${url}: HTTP ${response.status}`);
   }
   const buffer = Buffer.from(await response.arrayBuffer());
-  return { sha256: sha256(buffer), sizeBytes: buffer.length };
+  return { sha256: sha256(buffer), sizeBytes: buffer.length, buffer };
+}
+
+/// Baca nama entri dari direktori pusat sebuah ZIP.
+///
+/// Ditulis manual alih-alih menambah dependensi: satu-satunya yang dibutuhkan
+/// adalah daftar nama, dan setiap paket baru di CI adalah permukaan
+/// supply-chain baru (semangat yang sama dengan T11 di PRD).
+export function readZipEntryNames(buffer) {
+  const EOCD_SIG = 0x06054b50;
+  const CDH_SIG = 0x02014b50;
+
+  // EOCD ada di akhir berkas, didahului komentar yang panjangnya maksimum
+  // 65535 byte. Dicari mundur dari ujung.
+  let eocd = -1;
+  const from = Math.max(0, buffer.length - (0xffff + 22));
+  for (let i = buffer.length - 22; i >= from; i -= 1) {
+    if (buffer.readUInt32LE(i) === EOCD_SIG) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd < 0) throw new Error("bukan berkas ZIP yang valid (EOCD tidak ditemukan)");
+
+  const count = buffer.readUInt16LE(eocd + 10);
+  let p = buffer.readUInt32LE(eocd + 16);
+
+  const names = [];
+  for (let i = 0; i < count; i += 1) {
+    if (buffer.readUInt32LE(p) !== CDH_SIG) {
+      throw new Error("direktori pusat ZIP rusak");
+    }
+    const nameLen = buffer.readUInt16LE(p + 28);
+    const extraLen = buffer.readUInt16LE(p + 30);
+    const commentLen = buffer.readUInt16LE(p + 32);
+    names.push(buffer.toString("utf8", p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return names;
+}
+
+/// Entri akar sebuah arsip bundle — nama folder `.vst3` di dalamnya.
+///
+/// Melempar kalau arsipnya tidak berbentuk seperti bundle. Ini yang membuat
+/// `archive_root` di katalog TIDAK MUNGKIN berbeda dari isi arsip; sebelumnya
+/// ia ditebak dari nama plugin, dan tebakan yang salah baru ketahuan di mesin
+/// pengguna setelah unduhan selesai.
+export function readArchiveRoot(buffer) {
+  const names = readZipEntryNames(buffer);
+
+  for (const name of names) {
+    if (name.includes("\\")) {
+      throw new Error(
+        `nama entri "${name}" memakai backslash; spesifikasi ZIP menetapkan "/". ` +
+          "Arsip seperti ini dihasilkan Compress-Archive di Windows dan ditolak launcher."
+      );
+    }
+  }
+
+  const roots = [...new Set(names.map((n) => n.split("/")[0]).filter(Boolean))];
+  if (roots.length !== 1) {
+    throw new Error(
+      `entri akar harus tepat satu, ditemukan: ${roots.join(", ") || "(tidak ada)"}`
+    );
+  }
+  if (!roots[0].toLowerCase().endsWith(".vst3")) {
+    throw new Error(`entri akar "${roots[0]}" bukan bundle .vst3`);
+  }
+  if (!names.some((n) => /Contents\/x86_64-win\/.+\.vst3$/i.test(n))) {
+    throw new Error("tidak ada DLL di Contents/x86_64-win/ — bundle tidak lengkap");
+  }
+  return roots[0];
 }
 
 export function fail(message) {

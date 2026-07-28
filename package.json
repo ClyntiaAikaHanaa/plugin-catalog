@@ -7,7 +7,8 @@
   "scripts": {
     "build": "node scripts/build-catalog.mjs",
     "validate": "node scripts/validate.mjs",
-    "check": "npm run validate && npm run build",
+    "check": "npm run selftest && npm run validate && npm run build",
+    "selftest": "node scripts/selftest.mjs",
     "smoke": "node scripts/smoke-test.mjs"
   },
   "devDependencies": {

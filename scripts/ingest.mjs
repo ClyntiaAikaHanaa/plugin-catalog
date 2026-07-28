@@ -12,6 +12,7 @@ import {
   compareSemver,
   fetchAndHash,
   licenseFileName,
+  readArchiveRoot,
 } from "./lib.mjs";
 
 /// Berapa banyak versi historis yang disimpan (Open Question Q5).
@@ -53,30 +54,111 @@ export function pluginPath(pluginId) {
   return join(SRC_PLUGINS, `${pluginId}.json`);
 }
 
-/// Buat file plugin baru dari metadata repo.
+/// Kategori dikenali dari topic repo, mis. topic `reverb` → kategori `reverb`.
 ///
-/// Field yang tidak dapat diketahui dari GitHub — kategori, `user_data`,
-/// `requirements` — diisi default yang aman dan **harus** kamu sunting sendiri.
-/// Karena itu plugin baru lahir dengan `hidden: true`: ia tidak tampil di
-/// launcher sampai kamu memeriksanya. Menampilkan plugin dengan kategori asal
-/// tebak lebih buruk daripada tidak menampilkannya sama sekali.
-export function newPluginStub(repo, pluginId) {
+/// Ini satu-satunya metadata yang benar-benar butuh penilaian manusia, dan
+/// topic adalah tempat paling murah untuk menyatakannya: satu klik di halaman
+/// repo, terlihat oleh siapa pun, dan dapat diubah tanpa menyentuh katalog.
+export const KNOWN_CATEGORIES = [
+  "dynamics",
+  "reverb",
+  "eq",
+  "modulation",
+  "distortion",
+  "utility",
+];
+
+function categoryFromTopics(topics) {
+  return (topics ?? []).find((t) => KNOWN_CATEGORIES.includes(t)) ?? null;
+}
+
+/// Ambil judul, tagline, dan paragraf pembuka dari README.
+///
+/// Pola yang diandalkan — `# Judul`, lalu baris `**tagline**`, lalu paragraf —
+/// adalah bentuk yang dipakai semua README plugin ini. Kalau sebuah README
+/// tidak mengikutinya, field yang bersangkutan dibiarkan kosong dan diisi dari
+/// sumber lain; tidak ada yang ditebak-tebak.
+export function parseReadmeHeader(markdown) {
+  const lines = (markdown ?? "").split(/\r?\n/);
+
+  let title = null;
+  let tagline = null;
+  const paragraph = [];
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    if (!title) {
+      const h1 = /^#\s+(.+)$/.exec(line);
+      if (h1) title = h1[1].trim();
+      continue;
+    }
+    if (!tagline) {
+      // `**Tagline**` atau `### Tagline` — keduanya dipakai di repo ini.
+      const bold = /^\*\*(.+?)\*\*$/.exec(line);
+      const h3 = /^#{2,4}\s+(.+)$/.exec(line);
+      if (bold) tagline = bold[1].trim();
+      else if (h3) tagline = h3[1].trim();
+      else if (!line.startsWith("#")) paragraph.push(line);
+      continue;
+    }
+    // Paragraf pembuka berhenti di heading berikutnya.
+    if (line.startsWith("#")) break;
+    paragraph.push(line);
+  }
+
+  return {
+    title,
+    tagline: tagline?.slice(0, 200) ?? null,
+    description: paragraph.join(" ").slice(0, 2000) || null,
+  };
+}
+
+/// Vendor dari `COMPANY_NAME` di CMakeLists — nama yang benar-benar tertanam
+/// di plugin, bukan nama akun GitHub.
+export async function vendorFromCMake(repo) {
+  try {
+    const res = await fetch(`https://raw.githubusercontent.com/${repo}/HEAD/CMakeLists.txt`, {
+      headers: { "user-agent": "studio-hub-catalog-ci" },
+    });
+    if (!res.ok) return null;
+    const text = await res.text();
+    return /COMPANY_NAME\s+"([^"]+)"/.exec(text)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/// Buat file plugin baru dari metadata repo, README, dan CMakeLists.
+///
+/// `hidden` ditentukan oleh satu aturan: **sembunyikan kalau ada yang ditebak.**
+/// Kategori adalah satu-satunya field yang tidak dapat diturunkan dari isi
+/// repo, jadi tanpa topic kategori, plugin lahir tersembunyi. Dengan topic itu,
+/// semuanya berasal dari sumber yang bisa diperiksa dan ia langsung terbit.
+export async function newPluginStub(repo, pluginId, readme) {
+  const header = parseReadmeHeader(readme);
+  const category = categoryFromTopics(repo.topics);
+  const vendor = (await vendorFromCMake(repo.full_name)) ?? repo.owner?.login ?? "Unknown";
+
   return {
     id: pluginId,
-    name: repo.name,
-    vendor: repo.owner?.login ?? "Unknown",
-    category: "utility",
-    tagline: (repo.description ?? repo.name).slice(0, 200),
-    description: repo.description ?? "",
+    name: header.title ?? repo.name,
+    vendor,
+    category: category ?? "utility",
+    tagline: (header.tagline ?? repo.description ?? repo.name).slice(0, 200),
+    tagline_i18n: {},
+    description: header.description ?? repo.description ?? "",
+    description_i18n: {},
     homepage_url: repo.homepage?.startsWith("https://") ? repo.homepage : repo.html_url,
     source_url: repo.html_url,
     license: repo.license?.spdx_id ?? null,
-    hidden: true,
+    hidden: category === null,
     deprecated: repo.archived ?? false,
     deprecation_notice: null,
     commercial: { model: "free", requires_license: false, purchase_url: null },
     user_data: { preset_paths: [], config_paths: [] },
-    requirements: {},
+    requirements: { os_min_build: 17763, cpu_features: ["sse2"] },
   };
 }
 
@@ -265,12 +347,16 @@ export async function ingestRelease({
   let plugin;
   let created = false;
 
+  // README diambil lebih dulu: entri baru menurunkan judul, tagline, dan
+  // paragraf pembukanya dari sana.
+  const readme = await fetchReadme(repo).catch(() => "");
+
   if (existsSync(path)) {
     plugin = JSON.parse(await readFile(path, "utf8"));
   } else {
     const meta = repoMeta ?? (await githubJson(`https://api.github.com/repos/${repo}`));
     if (!meta) throw new Error(`repo ${repo} tidak ditemukan`);
-    plugin = newPluginStub(meta, pluginId);
+    plugin = await newPluginStub(meta, pluginId, readme);
     created = true;
   }
 
@@ -305,14 +391,33 @@ export async function ingestRelease({
 
   // Hash dihitung dari byte yang benar-benar diunduh, bukan dari nilai yang
   // diberikan payload dispatch (PRD §10.5 langkah 2).
-  const { sha256, sizeBytes } = await fetchAndHash(downloadUrl);
+  const { sha256, sizeBytes, buffer } = await fetchAndHash(downloadUrl);
   if (asset.size && asset.size !== sizeBytes) {
     throw new Error(
       `${repo}: ukuran asset (${asset.size}) berbeda dari yang diunduh (${sizeBytes})`
     );
   }
 
+  // `archive_root` DIBACA dari arsipnya, tidak ditebak dari nama plugin.
+  // Tebakan yang salah lolos setiap pemeriksaan di sini dan baru gagal di
+  // mesin pengguna, setelah unduhan selesai — mode kegagalan termahal di
+  // seluruh alur ini.
+  let archiveRoot;
+  try {
+    archiveRoot = readArchiveRoot(buffer);
+  } catch (e) {
+    throw new Error(`${repo} ${version}: arsip ditolak — ${e.message}`);
+  }
+
   const previousBuild = plugin.latest?.builds?.find((b) => b.target === "windows-x86_64");
+  if (previousBuild && previousBuild.archive_root !== archiveRoot) {
+    // Nama bundle berubah antar rilis berarti plugin lama tidak akan tertimpa
+    // saat update — pengguna berakhir dengan dua salinan di folder VST3.
+    console.warn(
+      `  ⚠ ${pluginId}: nama bundle berubah dari "${previousBuild.archive_root}" ` +
+        `menjadi "${archiveRoot}". Pengguna yang memperbarui akan punya dua salinan.`
+    );
+  }
 
   const newRelease = {
     version,
@@ -328,10 +433,7 @@ export async function ingestRelease({
         url: downloadUrl,
         size_bytes: sizeBytes,
         sha256,
-        // `archive_root` adalah properti plugin, bukan properti rilis.
-        // Menebaknya dari nama file akan salah begitu nama repo berbeda dari
-        // nama bundle, jadi ia dipertahankan dari rilis sebelumnya kalau ada.
-        archive_root: previousBuild?.archive_root ?? `${plugin.name}.vst3`,
+        archive_root: archiveRoot,
         install_kind: "vst3_bundle",
         requires_vc_redist: previousBuild?.requires_vc_redist ?? true,
       },
@@ -345,12 +447,7 @@ export async function ingestRelease({
 
   // README dan logo disegarkan setiap rilis: keduanya berubah seiring plugin
   // berkembang, dan yang ditampilkan launcher harus versi terbaru.
-  try {
-    const readme = await fetchReadme(repo);
-    if (readme) plugin.readme = readme;
-  } catch (e) {
-    console.warn(`  README ${repo} tidak terambil: ${e.message}`);
-  }
+  if (readme) plugin.readme = readme;
   try {
     const license = await fetchLicense(repo);
     if (license?.spdx) {
@@ -374,6 +471,8 @@ export async function ingestRelease({
     version,
     sha256,
     sizeBytes,
-    archiveRoot: newRelease.builds[0].archive_root,
+    archiveRoot,
+    hidden: plugin.hidden === true,
+    category: plugin.category,
   };
 }

@@ -18,7 +18,14 @@
 // Pemakaian:
 //   node scripts/sync-repos.mjs --owner ClyntiaAikaHanaa [--dry-run]
 
-import { Outcome, PLUGIN_TOPIC, deriveId, githubJson, ingestRelease } from "./ingest.mjs";
+import {
+  KNOWN_CATEGORIES,
+  Outcome,
+  PLUGIN_TOPIC,
+  deriveId,
+  githubJson,
+  ingestRelease,
+} from "./ingest.mjs";
 
 const args = parseArgs(process.argv.slice(2));
 const owner = args.owner ?? process.env.GITHUB_REPOSITORY_OWNER;
@@ -102,13 +109,21 @@ for (const repo of repos) {
 
     switch (result.outcome) {
       case Outcome.Created:
-        console.log(
-          `+ ${full} → ${pluginId} ${result.version}\n` +
-            `    BARU — file dibuat dengan hidden:true. Sunting kategori,\n` +
-            `    user_data, dan requirements-nya, lalu set hidden:false.\n` +
-            `    archive_root ditebak "${result.archiveRoot}" — pastikan itu\n` +
-            `    benar-benar nama folder di dalam ZIP.`
-        );
+        if (result.hidden) {
+          console.log(
+            `+ ${full} → ${pluginId} ${result.version} — TERSEMBUNYI\n` +
+              `    Kategori tidak dapat ditentukan, jadi terisi tebakan "utility".\n` +
+              `    Tambahkan salah satu topic berikut di repo, lalu jalankan lagi:\n` +
+              `      ${KNOWN_CATEGORIES.join(", ")}\n` +
+              `    Atau sunting "category" dan "hidden" di src/plugins/${pluginId}.json.`
+          );
+        } else {
+          console.log(
+            `+ ${full} → ${pluginId} ${result.version} — BARU, kategori "${result.category}"\n` +
+              `    Semua metadata diturunkan dari repo. Yang tersisa hanya\n` +
+              `    terjemahan Indonesia di tagline_i18n dan description_i18n.`
+          );
+        }
         created += 1;
         break;
       case Outcome.Updated:
