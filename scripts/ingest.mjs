@@ -212,6 +212,20 @@ export async function vendorFromCMake(repo) {
 /// Kategori adalah satu-satunya field yang tidak dapat diturunkan dari isi
 /// repo, jadi tanpa topic kategori, plugin lahir tersembunyi. Dengan topic itu,
 /// semuanya berasal dari sumber yang bisa diperiksa dan ia langsung terbit.
+/// SPDX id dari GitHub, dinormalkan.
+///
+/// GitHub mengembalikan `"NOASSERTION"` kalau ia menemukan berkas lisensi tapi
+/// tidak dapat mengenalinya, dan `"NONE"` kalau tidak ada berkas lisensi sama
+/// sekali. Keduanya bukan identitas lisensi, jadi meneruskannya apa adanya
+/// membuat UI menampilkan "NOASSERTION" seolah-olah itu nama lisensi — dan
+/// mencari teksnya di `src/licenses/NOASSERTION.txt` yang tidak akan pernah ada.
+function normalizeSpdx(id) {
+  if (!id) return null;
+  const upper = String(id).toUpperCase();
+  if (upper === "NOASSERTION" || upper === "NONE") return null;
+  return id;
+}
+
 export async function newPluginStub(repo, pluginId, readme) {
   const header = parseReadmeHeader(readme);
   const category = categoryFromTopics(repo.topics);
@@ -228,7 +242,7 @@ export async function newPluginStub(repo, pluginId, readme) {
     description_i18n: {},
     homepage_url: repo.homepage?.startsWith("https://") ? repo.homepage : repo.html_url,
     source_url: repo.html_url,
-    license: repo.license?.spdx_id ?? null,
+    license: normalizeSpdx(repo.license?.spdx_id),
     hidden: category === null,
     deprecated: repo.archived ?? false,
     deprecation_notice: null,
@@ -321,7 +335,7 @@ export async function fetchLicense(repo) {
   if (!data?.content) return null;
   const text = Buffer.from(data.content, "base64").toString("utf8");
   return {
-    spdx: data.license?.spdx_id ?? null,
+    spdx: normalizeSpdx(data.license?.spdx_id),
     // Teks lisensi dirender apa adanya di blok bergulir, jadi tidak perlu
     // dibersihkan seperti README — justru mengubahnya akan salah.
     text: text.slice(0, 120_000),

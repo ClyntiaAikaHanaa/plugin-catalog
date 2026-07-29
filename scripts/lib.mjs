@@ -108,7 +108,18 @@ export function licenseFileName(spdx) {
 /// launcher menuntut `latest` ada, dan entri tanpa rilis akan dilewatinya
 /// sebagai data rusak. Lebih baik tidak diterbitkan sejak awal.
 export function isPublishable(plugin) {
-  return Boolean(plugin?.latest?.builds?.length);
+  // Punya build = dapat dipasang launcher.
+  if (plugin?.latest?.builds?.length) return true;
+
+  // Tidak punya build tapi punya halaman rilis = plugin yang mendistribusikan
+  // installer sendiri. Ia tetap layak terbit: halaman detailnya berguna
+  // (README, logo, metadata), dan tombol pasangnya mengarahkan pengguna ke
+  // halaman rilis alih-alih memasang apa pun.
+  //
+  // Tanpa cabang ini, entri seperti itu terbentuk dengan benar di `src/plugins`
+  // lalu tersaring diam-diam saat build — kelihatannya seperti sync yang gagal,
+  // padahal sync-nya berhasil.
+  return Boolean(plugin?.release_page_url);
 }
 
 /// Bandingkan dua semver. Sengaja tidak memakai perbandingan string: itu bug
