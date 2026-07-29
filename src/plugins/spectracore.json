@@ -1,0 +1,43 @@
+{
+  "id": "spectracore",
+  "name": "SpectraCore",
+  "vendor": "AnakBaek DSP",
+  "category": "modulation",
+  "tagline": "GPU accelerated spectral pitch correction and resynthesis plug-in",
+  "tagline_i18n": {},
+  "description": "GPU accelerated spectral pitch correction and resynthesis plug-in",
+  "description_i18n": {},
+  "homepage_url": "https://github.com/ClyntiaAikaHanaa/SpectraCore",
+  "source_url": "https://github.com/ClyntiaAikaHanaa/SpectraCore",
+  "license": "NOASSERTION",
+  "hidden": false,
+  "deprecated": false,
+  "deprecation_notice": null,
+  "commercial": {
+    "model": "free",
+    "requires_license": false,
+    "purchase_url": null
+  },
+  "user_data": {
+    "preset_paths": [],
+    "config_paths": []
+  },
+  "requirements": {
+    "os_min_build": 17763,
+    "cpu_features": [
+      "sse2"
+    ]
+  },
+  "release_page_url": "https://github.com/ClyntiaAikaHanaa/SpectraCore/releases/tag/v1.0.0",
+  "latest": {
+    "version": "1.0.0",
+    "released_at": "2026-07-28T23:27:06Z",
+    "breaking": false,
+    "security": false,
+    "min_launcher_version": "1.0.0",
+    "changelog": "### 1.0.0\n",
+    "builds": []
+  },
+  "readme": "![SpectraCore](https://raw.githubusercontent.com/ClyntiaAikaHanaa/SpectraCore/HEAD/Screenshot/Logo.png)\n\n**GPU accelerated spectral pitch correction and resynthesis plug-in**\n\nVST3 and Standalone for Windows, built with JUCE and the GPU Audio SDK\n\n---\n\n## What it is\n\nSpectraCore is a real-time spectral processor built around a peak locked phase\nvocoder. It retunes audio to a musical scale, reshapes its spectrum, and can\nresynthesise the result additively. The heavy FFT work runs either on the CPU or\non the GPU through the GPU Audio engine, which makes large FFT sizes (up to\n65536 on the GPU) usable in real time.\n\n![SpectraCore user interface](https://raw.githubusercontent.com/ClyntiaAikaHanaa/SpectraCore/HEAD/Screenshot/Main.png)\n\n## Features\n\n**Pitch and scale**\n* Peak locked phase vocoder with region shifting (Laroche and Dolson style)\n* Scale quantisation: Major, Minor, Harmonic Minor, Pentatonic Major, Pentatonic Minor, Chromatic\n* Adjustable quantise strength and snap curve (glide time from instant to 500 ms)\n* MIDI mode: drive the target pitch from incoming MIDI notes\n\n**Spectral shaping**\n* Spectral smear: magnitude blur across bins\n* Unison spread: detuned voices in the spectral domain\n* Original character: re-imposes the source spectral envelope on the output\n* Transient preservation with spectral flux detection, adjustable gain and sustain\n\n**Synthesis engines**\n* Phase Vocoder\n* Additive resynthesis (tracked partials into an oscillator bank)\n* Hybrid (additive harmonics plus a frame locked residual)\n\n**Interface**\n* Interactive EQ curve editor with per band LFO or envelope modulation\n* Editable LFO shape with tempo sync\n* Output metering, hard clip ceiling, gain offset\n\n**Processing**\n* CPU engine (FFT sizes 256 to 4096)\n* GPU engine via the GPU Audio SDK (FFT sizes 2048 to 65536)\n* Automatic fallback to the CPU engine when no supported GPU or platform is present\n\n## Requirements\n\n**To run the plug-in**\n* Windows 11 x64\n* A VST3 host, or use the included standalone application\n* For GPU acceleration:\n  * NVIDIA GPU (Maxwell through Blackwell) with driver 576.2 or newer, or an AMD Radeon RX 6000 series or newer\n  * GPU Audio Platform version 2.3.0.219 or newer\n\n> **Note on RTX 50 series:** GPU Audio Platform versions before 2.3.0.219 do not\n> contain kernels for Blackwell (sm_120) and will fail to start the engine on\n> RTX 50 series cards. Install 2.3.0.219 or newer.\n\nGPU acceleration is optional. Without a supported GPU or without the platform\ninstalled, SpectraCore runs its CPU engine instead.\n\n**To build from source**\n* Visual Studio Build Tools 2026 (or Visual Studio 2026) with:\n  * MSVC v143 (14.44) build tools\n  * Windows 11 SDK\n  * C++ CMake tools for Windows\n* CUDA Toolkit 12.9 (for the NVIDIA processor module)\n* HIP SDK 6.4.2 and a Perl interpreter (only if you want to build the AMD module)\n* Inno Setup 6 (only if you want to build the installer)\n\n## Installation\n\n1. Download the latest installer from the Releases page.\n2. Run it and choose whether to enable GPU acceleration and where the VST3 should go.\n3. If you enabled GPU acceleration, install the\n   GPU Audio Platform (2.3.0.219 or newer).\n   The installer will remind you and offer to open the download page.\n\nThe GPU Audio Platform is **not** bundled with this installer. It is a separate\nproduct with its own licence, so you install it yourself from the official site.\n\n## Building from source\n\n```bash\ngit clone --recurse-submodules https://github.com/YOUR_USERNAME/SpectraCore.git\n```\n\nIf you already cloned without submodules:\n\n```bash\ngit submodule update --init --recursive\n```\n\nThen run the build script from the project root:\n\n```bash\npowershell -ExecutionPolicy Bypass -File .\\build_rtx.ps1\n```\n\nThe script configures CMake with the `v143,cuda=12.9` toolset, builds the\nRelease configuration, and deploys the GPU processor module to the engine's\nprocessors folder.\n\n**Two things worth knowing:**\n\n* The build directory must be named `@BUILD`. The GPU Audio SDK's CMake helpers\n  detect generated files by matching that name in the path, and any other name\n  breaks the `source_group` step.\n* The AMD processor module in `prebuilt/` is a checked in binary, because\n  rebuilding it needs the HIP SDK which is not part of the normal setup. The\n  installer prefers a freshly built AMD module in `@BUILD` when one exists and\n  falls back to the prebuilt copy otherwise. The NVIDIA module is always built\n  from source.\n* On a first build you need to run `admin_setup.ps1` once as administrator. It\n  registers the CUDA MSBuild integration with Visual Studio and grants write\n  access to the VST3 and GPU Audio processor folders so the automatic deployment\n  steps work without elevation.\n\n## Licensing\n\nThis project combines components under three different licences. Please read\nthis section before redistributing anything.\n\n| Component | Licence |\n|---|---|\n| SpectraCore (this repository) | CC BY-NC-SA 4.0 |\n| JUCE | AGPLv3 or the commercial JUCE licence |\n| GPU Audio SDK | CC BY-NC-SA 4.0 |\n| GPU Audio Platform (engine) | Proprietary, distributed by GPU Audio |\n\n**What this means in practice:**\n\n* SpectraCore is **source available**, not open source in the OSI sense. The\n  NonCommercial clause inherited from the GPU Audio SDK means this project\n  cannot be sold or used for commercial advantage.\n* You may study, modify and share it for non commercial purposes, with\n  attribution, and derivative works must carry the same licence.\n* Neither the GPU Audio SDK nor the GPU Audio Platform is redistributed here.\n  The SDK is referenced as a git submodule and the platform is downloaded by\n  the user from the official site.\n\n## Support\n\nSpectraCore is free and always will be. If it is useful to you and you would\nlike to help keep the project going, voluntary donations are welcome. There is\nno paywall, no locked features and no difference between what a supporter and a\nnon supporter receives.\n\n## Acknowledgements\n\n* JUCE by Raw Material Software\n* GPU Audio SDK by Braingines SA / GPU Audio INC",
+  "icon_url": "https://raw.githubusercontent.com/ClyntiaAikaHanaa/SpectraCore/HEAD/Screenshot/Logo.png"
+}
