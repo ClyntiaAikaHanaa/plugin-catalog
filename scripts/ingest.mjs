@@ -481,17 +481,40 @@ export async function ingestRelease({
   const readme = await fetchReadme(repo).catch(() => "");
   const manifest = await fetchPluginManifest(repo).catch(() => null);
 
+  // Metadata repo diambil selalu, bukan hanya saat entri dibuat: topic-nya
+  // adalah sumber kebenaran kategori, dan kategori dapat berubah tanpa rilis
+  // baru. `sync-repos.mjs` sudah memilikinya, jadi tidak ada request tambahan
+  // di jalur yang paling sering dipakai.
+  const meta = repoMeta ?? (await githubJson(`https://api.github.com/repos/${repo}`));
+
   if (existsSync(path)) {
     plugin = JSON.parse(await readFile(path, "utf8"));
   } else {
-    const meta = repoMeta ?? (await githubJson(`https://api.github.com/repos/${repo}`));
     if (!meta) throw new Error(`repo ${repo} tidak ditemukan`);
     plugin = await newPluginStub(meta, pluginId, readme);
     created = true;
   }
 
+  // Snapshot untuk mendeteksi perubahan metadata pada rilis yang sudah dikenal.
+  const before = JSON.stringify(plugin);
+
+  // Kategori diturunkan ulang dari topic setiap sync.
+  //
+  // Sebelumnya ini hanya terjadi di `newPluginStub`, jadi mengubah topic repo
+  // tidak pernah sampai ke katalog: entri yang sudah ada melewati jalur itu
+  // sepenuhnya. Gejalanya membingungkan — topic sudah benar di GitHub, sync
+  // dijalankan, dan kategorinya tetap yang lama selamanya.
+  const topicCategory = categoryFromTopics(meta?.topics);
+  if (topicCategory) {
+    plugin.category = topicCategory;
+    // Plugin yang dulu disembunyikan karena kategorinya tak dikenal kini punya
+    // jawaban, jadi tidak ada lagi alasan menyembunyikannya.
+    plugin.hidden = false;
+  }
+
   // Diterapkan setiap rilis, bukan hanya saat entri dibuat: mengubah manifes
   // di repo plugin harus sampai ke katalog tanpa menyentuh katalognya.
+  // Dijalankan SETELAH topic supaya manifes tetap menang.
   applyManifest(plugin, manifest);
   if (manifest?.category && KNOWN_CATEGORIES.includes(manifest.category)) {
     plugin.hidden = false;
@@ -506,8 +529,27 @@ export async function ingestRelease({
 
   // Versi yang tidak lebih tinggi dari `latest` bukan error — sinkronisasi
   // terjadwal akan melihat rilis yang sama berkali-kali.
+  //
+  // Tapi versi yang sama BUKAN alasan mengabaikan perubahan metadata. Kategori,
+  // README, logo, dan lisensi berubah tanpa rilis baru, dan dulu perubahan itu
+  // tidak pernah sampai ke katalog karena sync berhenti di sini sebelum menulis
+  // apa pun. Sekarang metadata disegarkan lebih dulu, lalu entri ditulis hanya
+  // kalau ada yang benar-benar berubah — supaya sync yang tidak menemukan apa pun
+  // tetap tidak menghasilkan commit.
   if (plugin.latest && compareSemver(version, plugin.latest.version) <= 0) {
-    return { outcome: Outcome.Skipped, reason: `${version} sudah ada di katalog` };
+    await refreshRepoMetadata(plugin, repo, readme);
+
+    if (JSON.stringify(plugin) === before) {
+      return { outcome: Outcome.Skipped, reason: `${version} sudah ada di katalog` };
+    }
+
+    await mkdir(SRC_PLUGINS, { recursive: true });
+    await writeFile(path, `${JSON.stringify(plugin, null, 2)}\n`);
+    return {
+      outcome: Outcome.Updated,
+      version,
+      reason: `metadata disegarkan (versi tetap ${version})`,
+    };
   }
 
   const asset = pickWindowsAsset(data.assets ?? []);

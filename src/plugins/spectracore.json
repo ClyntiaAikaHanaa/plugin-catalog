@@ -2,7 +2,7 @@
   "id": "spectracore",
   "name": "SpectraCore",
   "vendor": "AnakBaek DSP",
-  "category": "modulation",
+  "category": "eq",
   "tagline": "GPU accelerated spectral pitch correction and resynthesis plug-in",
   "tagline_i18n": {},
   "description": "GPU accelerated spectral pitch correction and resynthesis plug-in",
